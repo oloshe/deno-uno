@@ -1,5 +1,5 @@
 import { mainMenu } from "./menu.ts"
-import { createWebsocket } from "./ws.ts"
+import { createWebsocket } from "./net/ws.ts"
 
 
 if (import.meta.main) {

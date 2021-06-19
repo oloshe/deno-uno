@@ -1,14 +1,14 @@
 export class User {
-	private name: string
+	private _name: string
 	constructor(name: string) {
-		this.name = name
+		this._name = name
 	}
 	setName(name: string) {
-		this.name = name
+		this._name = name
 	}
-	getName() {
-		return this.name
+	get name() {
+		return this._name
 	}
 }
 
-export const playerUser = new User('')
+export const playerUser = new User('nick')

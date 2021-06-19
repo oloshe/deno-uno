@@ -25,10 +25,18 @@ export {
 } from "./client/dialoguer.ts"
 
 export {
-	Event
+	MyEvent
 } from "./client/net/event.ts";
 export type { EventData } from "./client/net/event.ts";
 
 export type {
 	TransData
 } from "./common/ws.dto.ts"
+
+export {
+	RoomData
+} from "./common/room.ts"
+
+export {
+	ws
+} from "./client/net/ws.ts"

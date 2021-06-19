@@ -1,3 +1,4 @@
+
 declare window {
-	var playerUser: any
+	var playerUser: User
 }
