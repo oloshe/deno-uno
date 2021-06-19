@@ -1,6 +1,11 @@
-import { MyEvent, EventData } from "../deps.ts"
+import { MyEvent, EventData, ResponseData } from "../deps.ts"
 
-export interface TransData<T extends MyEvent> {
+export interface ReqData<T extends MyEvent> {
 	func: T,
 	data: EventData<T>,
+}
+
+export interface RespData<T extends MyEvent> {
+	func: T,
+	data: ResponseData<T>
 }

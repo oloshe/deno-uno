@@ -1,4 +1,4 @@
-import { RoomData } from "../../deps.ts"
+import { RoomData, IRoomRes } from "../../deps.ts"
 export enum MyEvent {
 	Login,
 	CreateRoom,
@@ -14,7 +14,7 @@ interface EventDataDefine {
 }
 
 interface ResponseEventDataDefine {
-	[MyEvent.GetRoomList]: RoomData[]
+	[MyEvent.GetRoomList]: IRoomRes[]
 }
 
 export type EventData<T> = T extends MyEvent

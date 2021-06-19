@@ -5,7 +5,7 @@ import {
 	isWebSocketCloseEvent,
 	// isWebSocketPingEvent,
 	WebSocket,
-	TransData,
+	ReqData,
 } from "../deps.ts";
 import {
 	handleEvent
@@ -16,7 +16,7 @@ async function handleWs(sock: WebSocket) {
 	try {
 		for await (const ev of sock) {
 			if (typeof ev === "string") {
-				const _data: TransData<never> = JSON.parse(ev)
+				const _data: ReqData<never> = JSON.parse(ev)
 				handleEvent(_data, sock);
 			}
 			// else if (ev instanceof Uint8Array) {

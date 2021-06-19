@@ -27,15 +27,16 @@ export {
 export {
 	MyEvent
 } from "./client/net/event.ts";
-export type { EventData } from "./client/net/event.ts";
+export type { EventData,  ResponseData } from "./client/net/event.ts";
 
 export type {
-	TransData
+	ReqData
 } from "./common/ws.dto.ts"
 
 export {
-	RoomData
-} from "./common/room.ts"
+RoomData
+} from "./common/room.ts";
+export type { IRoomRes } from "./common/room.ts";
 
 export {
 	ws

@@ -5,20 +5,21 @@ export const mainMenu = async () => {
 		console.clear()
 		myInfo()
 		console.log()
+		const items = [
+			'room list',
+			'create room',
+			'setting',
+			'exit',
+		]
 		const ret = await Dialoguer.Select({
 			title: 'please choose:',
-			items: [
-				'room list',
-				'create room',
-				'setting',
-				'exit',
-			]
+			items,
 		})
 		switch (ret) {
-			case 'room list': await roomList(); break;
-			case 'create room': await createRoom(); break;
-			case 'setting': await settingMenu(); break;
-			case 'exit': exit();
+			case items[0]: await roomList(); break;
+			case items[1]: await createRoom(); break;
+			case items[2]: await settingMenu(); break;
+			case items[3]: exit();
 		}
 	}
 }
@@ -43,10 +44,23 @@ export const myInfo = () => {
 	console.log(`hello ${playerUser.name} !`)
 }
 
-export const roomList = () => {
+export const roomList = async () => {
 	console.clear()
-	ws.send(MyEvent.GetRoomList, null, (data) => {
-		console.log(data)
+	return await new Promise((resolve) => {
+		console.log('go')
+		ws.send(MyEvent.GetRoomList, null, async (data) => {
+			const ret = await Dialoguer.Select({
+				title: 'please choose a room',
+				items: data.map(rd => {
+					return {
+						name: `${rd.name} [max:${rd.max}] [owner:${rd.owner}]`,
+						value: rd.name,
+					}
+				}),
+			})
+			console.log(ret)
+			resolve(void 0)
+		})
 	})
 }
 
