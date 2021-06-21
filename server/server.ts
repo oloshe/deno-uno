@@ -6,38 +6,39 @@ import {
 	// isWebSocketPingEvent,
 	WebSocket,
 	ReqData,
+	v4
 } from "../deps.ts";
 import {
 	handleEvent
 } from "./handler.ts"
+import { addConnection, delConnection, getPlayer } from "./cache.ts"
+import { Logger } from "./logger.ts"
+
 
 async function handleWs(sock: WebSocket) {
-	console.log("socket connected!");
+	Logger.log("socket connected!");
+	const sockid = v4.generate()
+	addConnection(sockid, sock)
 	try {
 		for await (const ev of sock) {
-			if (typeof ev === "string") {
-				const _data: ReqData<never> = JSON.parse(ev)
-				handleEvent(_data, sock);
-			}
-			// else if (ev instanceof Uint8Array) {
-			// 	// binary message.
-			// 	console.log("ws:Binary", ev);
-			// }
-			// else if (isWebSocketPingEvent(ev)) {
-			// 	const [, body] = ev;
-			// 	// ping.
-			// 	console.log("ws:Ping", body);
-			// }
-			else if (isWebSocketCloseEvent(ev)) {
+			if (isWebSocketCloseEvent(ev)) {
 				// close.
 				const { code, reason } = ev;
-				console.log("ws:Close", code, reason);
+				Logger.log("ws:Close", code, reason);
+				break;
+			}
+			if (typeof ev === "string") {
+				if (ev === '0') { sock.send('1'); continue }
+				const _data: ReqData<never> = JSON.parse(ev)
+				handleEvent(_data, sock, sockid);
 			}
 		}
+		Logger.log('[logout]', getPlayer(sockid)?.nick);
+		delConnection(sockid)
 	} catch (err) {
-		console.error(`failed to receive frame: ${err}`);
+		Logger.error(`failed to receive frame: ${err}`);
 		if (!sock.isClosed) {
-			await sock.close(1000).catch(console.error);
+			await sock.close(1000).catch(Logger.error);
 		}
 	}
 }
@@ -46,7 +47,7 @@ if (import.meta.main) {
 
 	const port = Deno.args[0] || "3333";
 
-	console.log(`websocket server is running on :${port}`);
+	Logger.log(`websocket server is running on :${port}`);
 	for await (const req of serve(`:${port}`)) {
 		const { conn, r: bufReader, w: bufWriter, headers } = req;
 		acceptWebSocket({
@@ -57,7 +58,7 @@ if (import.meta.main) {
 		})
 			.then(handleWs)
 			.catch(async (err) => {
-				console.error(`failed to accept websocket: ${err}`);
+				Logger.error(`failed to accept websocket: ${err}`);
 				await req.respond({ status: 400 });
 			});
 	}

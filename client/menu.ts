@@ -1,4 +1,19 @@
-import { Dialoguer, playerUser, MyEvent, Keypress, RoomData, ws } from "../deps.ts";
+import { Dialoguer, playerUser, MyEvent, Keypress, ws } from "../deps.ts";
+import { joinRoom } from "./game.ts"
+
+export const login = async () => {
+	while (1) {
+		const ret = await (await Dialoguer.Input({ title: 'please input a nick' })).trim()
+		const resp = await ws.sendFuture(MyEvent.Login, { nick: ret })
+		console.log(resp.succ)
+		if (resp.succ) {
+			playerUser.setName(ret)
+			break
+		} else {
+			console.log(`it's a duplicate nick, please try again!`)
+		}
+	}
+}
 
 export const mainMenu = async () => {
 	while (1) {
@@ -47,19 +62,28 @@ export const myInfo = () => {
 export const roomList = async () => {
 	console.clear()
 	return await new Promise((resolve) => {
-		console.log('go')
 		ws.send(MyEvent.GetRoomList, null, async (data) => {
+			if (data.length === 0) {
+				console.log('no room')
+				await new Keypress();
+				return resolve(void 0)
+			}
 			const ret = await Dialoguer.Select({
 				title: 'please choose a room',
-				items: data.map(rd => {
+				items: [...data.map(rd => {
 					return {
 						name: `${rd.name} [max:${rd.max}] [owner:${rd.owner}]`,
-						value: rd.name,
+						value: rd.id,
 					}
-				}),
+				}), ...[
+					'back'
+				]],
 			})
 			console.log(ret)
-			resolve(void 0)
+			switch (ret) {
+				case 'back': resolve(void 0); break;
+				default: await joinRoom(ret); break;
+			}
 		})
 	})
 }
@@ -74,8 +98,7 @@ const createRoom = async () => {
 		items: ['3', '4', '5', '6', '7', '8'],
 	})
 	const max = parseInt(inputNum)
-	const roomData = new RoomData({
+	ws.send(MyEvent.CreateRoom, {
 		name, max, owner: playerUser.name
 	})
-	ws.send(MyEvent.CreateRoom, roomData)
 }
