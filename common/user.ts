@@ -1,3 +1,5 @@
+import { UserState } from "./state.ts";
+
 export class User {
 	private _name: string
 	constructor(name: string) {
@@ -12,3 +14,10 @@ export class User {
 }
 
 export const playerUser = new User('nick')
+
+export interface PlayerData {
+	_sockid: string,
+	status: UserState,
+	nick: string
+	roomid?: string | null
+}

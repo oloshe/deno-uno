@@ -1,5 +1,5 @@
 import { MyEvent, ReqData, EventData, WebSocket, v4, UserState, ResponseEventDataDefine, ResponseData } from "../deps.ts"
-import { addRoomList, getRoomList, setPlayer, getRoomById } from "./cache.ts"
+import { addRoomList, getRoomList, setPlayer, userExitRoom, userJoinRoom, getRoomPlayers } from "./cache.ts"
 import { Logger } from "./logger.ts";
 
 export function handleEvent<T extends MyEvent>(
@@ -11,16 +11,22 @@ export function handleEvent<T extends MyEvent>(
 	const data = eventData.data as unknown
 	switch (func) {
 		case MyEvent.CreateRoom: {
+			const id = v4.generate()
+			// 添加房间
 			addRoomList({
 				...data as EventData<MyEvent.CreateRoom>,
-				id: v4.generate(),
+				id,
 				createTime: Date.now(),
 				count: 0,
 			});
+			// 加入房间
+			const succ = userJoinRoom(sockid, id)
+			respond(MyEvent.CreateRoom, { succ, players: succ ? getRoomPlayers(id) : void 0 })
 			break;
 		}
 		case MyEvent.GetRoomList: {
-			respond(MyEvent.GetRoomList, getRoomList());
+			const _data = data as EventData<MyEvent.GetRoomList>
+			respond(MyEvent.GetRoomList, getRoomList(_data.no, _data.num));
 			break;
 		}
 		case MyEvent.Login: {
@@ -31,17 +37,14 @@ export function handleEvent<T extends MyEvent>(
 			break;
 		}
 		case MyEvent.JoinRoom: {
-			// const _data = data as EventData<MyEvent.JoinRoom>
 			const _data = type<MyEvent.JoinRoom>(data)
-			const room = getRoomById(_data.id)
-			if (!room) {
-				respond(MyEvent.JoinRoom, { succ: false })
-			} else {
-				respond(MyEvent.JoinRoom, {
-					succ: true,
-					players: {}
-				})
-			}
+			const succ = userJoinRoom(sockid, _data.id)
+			respond(MyEvent.JoinRoom, { succ, players: succ ? getRoomPlayers(_data.id) : void 0 })
+			break;
+		}
+		case MyEvent.ExitRoom: {
+			// 用户离开房间
+			userExitRoom(sockid)
 			break;
 		}
 		default: break;
@@ -50,6 +53,10 @@ export function handleEvent<T extends MyEvent>(
 	function respond<T extends keyof ResponseEventDataDefine>(func: T, data: ResponseData<T>) {
 		sock.send(JSON.stringify({ func, data }))
 	}
+	// function push<T extends keyof PushDataDefine>(func: T, data: PushData<T>) {
+	// 	//@ts-ignore :)
+	// 	respond(func, data)
+	// }
 }
 
 function type<T extends MyEvent>(data: unknown) {

@@ -6,7 +6,8 @@ import {
 	// isWebSocketPingEvent,
 	WebSocket,
 	ReqData,
-	v4
+	v4,
+Constant
 } from "../deps.ts";
 import {
 	handleEvent
@@ -15,7 +16,7 @@ import { addConnection, delConnection, getPlayer } from "./cache.ts"
 import { Logger } from "./logger.ts"
 
 
-async function handleWs(sock: WebSocket) {
+export async function handleWs(sock: WebSocket) {
 	Logger.log("socket connected!");
 	const sockid = v4.generate()
 	addConnection(sockid, sock)
@@ -43,10 +44,7 @@ async function handleWs(sock: WebSocket) {
 	}
 }
 
-if (import.meta.main) {
-
-	const port = Deno.args[0] || "3333";
-
+export async function runServer(port = Constant.port) {
 	Logger.log(`websocket server is running on :${port}`);
 	for await (const req of serve(`:${port}`)) {
 		const { conn, r: bufReader, w: bufWriter, headers } = req;
@@ -62,4 +60,7 @@ if (import.meta.main) {
 				await req.respond({ status: 400 });
 			});
 	}
+}
+if (import.meta.main) {
+	runServer()
 }

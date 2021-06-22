@@ -22,17 +22,25 @@ export {
 
 export {
 	User,
-	playerUser,
-} from "./common/user.ts"
+	playerUser
+} from "./common/user.ts";
+export type { PlayerData } from "./common/user.ts";
 
 export {
 	Dialoguer
-} from "./client/dialoguer.ts"
+} from "./client/dialoguer.ts";
+export type { SelectOption } from "./client/dialoguer.ts";
 
 export {
 	MyEvent
 } from "./client/net/event.ts";
-export type { EventData,  ResponseData, ResponseEventDataDefine } from "./client/net/event.ts";
+export type {
+	EventData,
+	ResponseData,
+	ResponseEventDataDefine,
+	PushData,
+	PushDataDefine,
+} from "./client/net/event.ts";
 
 export type {
 	ReqData,
@@ -51,3 +59,7 @@ export type { IRoomReq, IRoomRes } from "./common/room.ts";
 export {
 	ws
 } from "./client/net/ws.ts"
+
+export {
+	Constant
+} from "./common/constant.ts"

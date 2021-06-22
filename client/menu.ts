@@ -1,19 +1,5 @@
-import { Dialoguer, playerUser, MyEvent, Keypress, ws } from "../deps.ts";
-import { joinRoom } from "./game.ts"
-
-export const login = async () => {
-	while (1) {
-		const ret = await (await Dialoguer.Input({ title: 'please input a nick' })).trim()
-		const resp = await ws.sendFuture(MyEvent.Login, { nick: ret })
-		console.log(resp.succ)
-		if (resp.succ) {
-			playerUser.setName(ret)
-			break
-		} else {
-			console.log(`it's a duplicate nick, please try again!`)
-		}
-	}
-}
+import { Dialoguer, playerUser, MyEvent, Keypress, ws, SelectOption } from "../deps.ts";
+import { gamePage, joinRoom } from "./game.ts"
 
 export const mainMenu = async () => {
 	while (1) {
@@ -59,33 +45,36 @@ export const myInfo = () => {
 	console.log(`hello ${playerUser.name} !`)
 }
 
-export const roomList = async () => {
+export const roomList = async (no = 1) => {
 	console.clear()
-	return await new Promise((resolve) => {
-		ws.send(MyEvent.GetRoomList, null, async (data) => {
-			if (data.length === 0) {
-				console.log('no room')
-				await new Keypress();
-				return resolve(void 0)
-			}
-			const ret = await Dialoguer.Select({
-				title: 'please choose a room',
-				items: [...data.map(rd => {
-					return {
-						name: `${rd.name} [max:${rd.max}] [owner:${rd.owner}]`,
-						value: rd.id,
-					}
-				}), ...[
-					'back'
-				]],
-			})
-			console.log(ret)
-			switch (ret) {
-				case 'back': resolve(void 0); break;
-				default: await joinRoom(ret); break;
-			}
-		})
+	const listNum = 5
+	const { list, max } = await ws.sendFuture(MyEvent.GetRoomList, { no, num: listNum })
+	const items: SelectOption['items'] = list.map(rd => {
+		return {
+			name: `${rd.name} [owner:${rd.owner}] [${rd.count}/${rd.max}]`,
+			value: rd.id,
+		}
+	});
+	items.push(Dialoguer.selectDivider)
+	no < max && items.push('next page');
+	no > 1 && items.push('prev page');
+	items.push(...[
+		'create room',
+		'back',
+	])
+
+	const selected = await Dialoguer.Select({
+		title: list.length === 0 ? `oop, it have no room` : 'please choose a room',
+		items,
 	})
+
+	switch (selected) {
+		case 'next page': await roomList(no + 1); break;
+		case 'prev page': await roomList(no - 1); break;
+		case 'create room': await createRoom(); break;
+		case 'back': break;
+		default: await joinRoom(selected);
+	}
 }
 
 const createRoom = async () => {
@@ -98,7 +87,13 @@ const createRoom = async () => {
 		items: ['3', '4', '5', '6', '7', '8'],
 	})
 	const max = parseInt(inputNum)
-	ws.send(MyEvent.CreateRoom, {
+	const ret = await ws.sendFuture(MyEvent.CreateRoom, {
 		name, max, owner: playerUser.name
 	})
+	if (ret.succ) {
+		await gamePage()
+	} else {
+		console.log('create room fail')
+		await new Keypress()
+	}
 }
