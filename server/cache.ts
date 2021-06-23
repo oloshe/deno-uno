@@ -169,10 +169,14 @@ export function roomStart(roomid: roomid, players: Record<string, unknown>) {
 	gameProcess[roomid] = pm
 	roomPlayerForEach(roomid, {
 		callback: (_, sid) => {
-			sendBySockId(MyEvent.GameStateChange, sid, GameState.Start
-			)
-			sendBySockId(MyEvent.GamePlayer, sid, {
-				cards: pm.players[sid]
+			const sock = getSockById(sid)
+			sendBySock(MyEvent.GameStateChange, sock, GameState.Start)
+			sendBySock(MyEvent.GameInit, sock, {
+				cards: pm.players[sid],
+				color: pm.currentColor,
+				turn: pm.turn,
+				direction: pm.direction,
+				gameStatus: GameState.Start,
 			})
 		}
 	})
@@ -192,6 +196,9 @@ export function getSockById(sockid: sockid) {
 export function sendBySockId<T extends MyEvent>(event: T, sockid: sockid, data: PushData<T>) {
 	const sock = getSockById(sockid)
 	if (!sock) return
+	sendBySock(event, sock, data)
+}
+export function sendBySock<T extends MyEvent>(event: T, sock: WebSocket, data: PushData<T>) {
 	sock.send(JSON.stringify({
 		func: event,
 		data,

@@ -34,7 +34,7 @@ export function handleEvent<T extends MyEvent>(
 			const _data = data as EventData<MyEvent.Login>
 			Logger.log(`[login]`, _data.nick)
 			const succ = setPlayer(_data.nick, UserState.Online, sockid)
-			respond(MyEvent.Login, { succ });
+			respond(MyEvent.Login, { succ, userId: sockid });
 			break;
 		}
 		case MyEvent.JoinRoom: {

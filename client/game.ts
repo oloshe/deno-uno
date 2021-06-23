@@ -1,4 +1,4 @@
-import { ws, MyEvent, Dialoguer, Cache, IRoomRes, PlayerData, Deferred, deferred, GameState, Card, readLines, CardFactory } from "../deps.ts"
+import { ws, MyEvent, Dialoguer, Cache, IRoomRes, PlayerData, Deferred, deferred, GameState, Card, readLines, CardFactory, CardColor, CardDirection } from "../deps.ts"
 
 export async function joinRoom(id: string) {
 	console.clear()
@@ -36,12 +36,27 @@ export async function gamePage() {
 		// 游戏状态改变
 		ws.on(MyEvent.GameStateChange, (data) => {
 			loop.gameState = data
-			if (data === GameState.Start) console.clear()
+			// if (data === GameState.Start) console.clear()
+			// loop.update()
+		}),
+		ws.on(MyEvent.GameInit, (data) => {
+			const {
+				direction,
+				turn,
+				color,
+				cards,
+				gameStatus,
+			} = data
+			loop.cards = cards.map(x => CardFactory.concretization(x))
+			loop.currentColor = color
+			loop.turn = turn
+			loop.direction = direction
+			loop.gameState = gameStatus
 			loop.update()
 		}),
-		// 游戏玩家变化
-		ws.on(MyEvent.GamePlayer, (data) => {
-			const cards: Card[] = data.cards.map(x => CardFactory.concretization(x))
+		// 游戏玩家卡牌变化
+		ws.on(MyEvent.MyCard, (data) => {
+			const cards: Card[] = data.map(x => CardFactory.concretization(x))
 			loop.cards = cards
 			loop.update()
 		})
@@ -62,6 +77,10 @@ class GameLoop {
 	players: Record<string, PlayerData>
 	cards: Card[] = []
 	gameState = GameState.Ready
+	currentColor: CardColor = CardColor.all
+	turn: string = ''
+	direction: CardDirection = CardDirection.Clockwise
+	myId: string = Cache.get(MyEvent.Login)!.userId
 
 	signal: Deferred<boolean>
 	_inputting = false
@@ -76,17 +95,41 @@ class GameLoop {
 
 	render() {
 		console.clear()
+		console.log('game status', this.gameState)
 		switch (this.gameState) {
 			case GameState.Ready: this.renderReadyState(); break;
 			case GameState.Start: this.renderGame(); break;
 		}
 	}
 
-	renderGame() {
+	async renderGame() {
 		console.log('Game')
-		this.cards.forEach(card => {
-			console.log(card.toStringUnicode());
-		})
+		if (this.turn === this.myId) {
+			this.cards.forEach(card => {
+				console.log(card.toStringUnicode());
+			})
+		} else {
+			console.log(this.cards)
+			const select = await Dialoguer.Select({
+				title: 'please choose a card',
+				items: [...this.cards.map((x, index) => {
+					console.log(x.toString())
+					return {
+						name: x.toStringUnicode(),
+						value: 'card',
+						disabled: 
+							(() => {
+							if (this.currentColor === CardColor.all || x.color === CardColor.all) {
+								return false
+							}
+							return x.color !== this.currentColor
+						})()
+					}
+				}), ...[
+					'draw a card',
+				]]
+			})
+		}
 	}
 
 	renderReadyState() {
@@ -105,22 +148,22 @@ class GameLoop {
 			.cursorNextLine();
 
 		if (!this._inputting) {
-			this._inputting = true
-			const buf = new Uint8Array(1024)
-			const read = async () => {
-				const n = await Deno.stdin.read(buf)
-				// Deno.stdin.read(buf).then(n => {
-				// 	this._inputting = false
-					if (n !== null) {
-						const str = new TextDecoder().decode(buf.subarray(0, n)).trim()
-						switch (str) {
-							case 'quit': case 'q': case 'exit': case 'e': this.end(); break;
-							default: Dialoguer.tty.text(`Invalid command: ${str}\n`); read();
-						}
-					}
-				// })
-			}
-			read()
+			// this._inputting = true
+			// const buf = new Uint8Array(1024)
+			// const read = async () => {
+			// 	const n = await Deno.stdin.read(buf)
+			// 	// Deno.stdin.read(buf).then(n => {
+			// 	// 	this._inputting = false
+			// 		if (n !== null) {
+			// 			const str = new TextDecoder().decode(buf.subarray(0, n)).trim()
+			// 			switch (str) {
+			// 				case 'quit': case 'q': case 'exit': case 'e': this.end(); break;
+			// 				default: Dialoguer.tty.text(`Invalid command: ${str}\n`); read();
+			// 			}
+			// 		}
+			// 	// })
+			// }
+			// read()
 		}
 	}
 

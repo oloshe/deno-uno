@@ -31,6 +31,13 @@ export enum CardType {
   colorSwitch,
 }
 
+export enum CardDirection{
+  /** 顺时针 */
+  Clockwise,
+  /** 逆时针 */
+  AntiClockwise,
+}
+
 const colorMap: Record<CardColor, string> = {
   [CardColor.blue]: '🔵 ' ,
   [CardColor.green]: '🟢 ',

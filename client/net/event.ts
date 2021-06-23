@@ -1,4 +1,4 @@
-import { Card, GameState, IRoomReq, IRoomRes, PlayerData } from "../../deps.ts"
+import { Card, CardColor, CardDirection, GameState, IRoomReq, IRoomRes, PlayerData } from "../../deps.ts"
 export enum MyEvent {
 	Login,
 	CreateRoom,
@@ -8,8 +8,18 @@ export enum MyEvent {
 	// PUSH
 	PlayerJoinRoom,
 	PlayerExitRoom,
+	/** 游戏状态改变 */
 	GameStateChange,
-	GamePlayer,
+	/** 游戏初始化数据 */
+	GameInit,
+	/** 牌变化 */
+	MyCard,
+	/** 轮到谁 */
+	TurnTo,
+	/** 牌方向 */
+	CardDirection,
+	/** 卡牌颜色变化 */
+	CardColorChange,
 }
 
 // 事件参数定义
@@ -35,7 +45,7 @@ interface EventDataDefine {
  * 字段不可与 [PushDataDefine] 重复，否则会有bug
  */
 export interface ResponseEventDataDefine {
-	[MyEvent.Login]: Result
+	[MyEvent.Login]: Result & { userId: string }
 	[MyEvent.CreateRoom]: Result & { roomid: string }
 	[MyEvent.GetRoomList]: {
 		list: IRoomRes[]
@@ -65,13 +75,17 @@ export interface PushDataDefine{
 		roomData: Pick<IRoomRes, 'count'>
 	}
 	[MyEvent.GameStateChange]: GameState
-	[MyEvent.GamePlayer]: {
-		cards: {
-			color: number
-			type: number
-			value?: number
-		}[]
+	[MyEvent.GameInit]: {
+		turn: string
+		color: CardColor
+		direction: CardDirection
+		cards: Card[]
+		gameStatus: GameState
 	}
+	[MyEvent.MyCard]: Card[]
+	[MyEvent.TurnTo]: string // 玩家id
+	[MyEvent.CardColorChange]: CardColor
+	[MyEvent.CardDirection]: CardDirection
 }
 
 export type EventData<T> = T extends MyEvent & keyof EventDataDefine

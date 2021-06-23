@@ -1,5 +1,5 @@
 
-import { CardType, Card, CardColor, SkipCard, Plus2Card, Plus4Card, NumberCard, ReverseCard, ColorSwitchCard } from "../deps.ts";
+import { CardType, Card, CardColor, SkipCard, Plus2Card, Plus4Card, NumberCard, ReverseCard, ColorSwitchCard, CardDirection } from "../deps.ts";
 
 export class PM {
 	static TOTAL_CARD_NUM = 107
@@ -25,15 +25,27 @@ export class PM {
 	/** 初始每人几张 */
 	DEAL_COUNT = 7
 
+	/** 玩家卡牌 */
 	players: Record<string, Card[]>
+	/** 所有卡牌 */
 	cards: Card[]
+	/** 轮到谁的回合 */
+	turn: string
+	/** 方向 */
+	direction: CardDirection
+	/** 当前出牌颜色 */
+	currentColor: CardColor
 
 	constructor(player: Record<string, unknown>) {
 		this.players = {}
-		Object.keys(player).forEach(key => this.players[key] = [])
+		const playerKey = Object.keys(player)
+		playerKey.forEach(key => this.players[key] = [])
 		this.cards = this.getInitialCard()
 		this.shuffle()
 		this.dealCards()
+		this.turn = playerKey[0]
+		this.direction = CardDirection.Clockwise
+		this.currentColor = CardColor.all
 	}
 
 	calCardScore(cards: Array<Card>): number {
