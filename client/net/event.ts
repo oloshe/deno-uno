@@ -66,7 +66,11 @@ export interface PushDataDefine{
 	}
 	[MyEvent.GameStateChange]: GameState
 	[MyEvent.GamePlayer]: {
-		cards: Card[]
+		cards: {
+			color: number
+			type: number
+			value?: number
+		}[]
 	}
 }
 

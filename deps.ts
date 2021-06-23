@@ -7,7 +7,7 @@ export {
 export type { WebSocket } from "https://deno.land/std@0.99.0/ws/mod.ts";
 
 export { v4 } from "https://deno.land/std@0.99.0/uuid/mod.ts";
-export { BufReader } from "https://deno.land/std@0.99.0/io/bufio.ts";
+export { BufReader, readLines } from "https://deno.land/std@0.99.0/io/bufio.ts";
 export { Buffer } from "https://deno.land/std@0.99.0/io/buffer.ts";
 export { readFrame } from "https://deno.land/std@0.99.0/ws/mod.ts";
 export { deferred } from "https://deno.land/std@0.99.0/async/deferred.ts";

@@ -1,3 +1,5 @@
+import { Dialoguer } from "../deps.ts";
+
 /**
  * 牌颜色
  */
@@ -29,6 +31,21 @@ export enum CardType {
   colorSwitch,
 }
 
+const colorMap: Record<CardColor, string> = {
+  [CardColor.blue]: '🔵 ' ,
+  [CardColor.green]: '🟢 ',
+  [CardColor.red]: '🔴 ',
+  [CardColor.yellow]: '🟡 ',
+  [CardColor.all]: '',
+}
+const valueMap: Record<Exclude<CardType, CardType.number>, string> = {
+  [CardType.plus2]: '➕ 2️⃣',
+  [CardType.reverse]: '🔄',
+  [CardType.skip]: '⤴️',
+  [CardType.plus4]: '➕ 4️⃣',
+  [CardType.colorSwitch]: '🎲',
+}
+const numberMap: string[] = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣']
 /**
  * 卡牌
  */
@@ -40,6 +57,32 @@ export abstract class Card {
     this.color = color;
   }
   abstract toString(): string;
+  toStringUnicode() {
+    const colorFlag = colorMap[this.color]
+    const valueFlag = this instanceof NumberCard
+      ? numberMap[this.value]
+      // @ts-ignore 
+      : valueMap[this.type]
+    return `${colorFlag}${valueFlag}`
+  }
+}
+
+export class CardFactory {
+  /** 具像化， 把基类转为具体类 */
+  static concretization(card: { type: number, color: number, value?: number }) {
+    const {
+      type, color, value
+    } = card;
+    switch (type) {
+      case CardType.number: return new NumberCard(value!, color)
+      case CardType.plus2: return new Plus2Card(color)
+      case CardType.reverse: return new ReverseCard(color)
+      case CardType.skip: return new SkipCard(color)
+      case CardType.colorSwitch: return new ColorSwitchCard()
+      case CardType.plus4: return new Plus4Card()
+      default: throw new Error('data parse error')
+    }
+  }
 }
 
 /**
@@ -64,7 +107,7 @@ export class Plus2Card extends Card {
     super(CardType.plus2, color);
   }
   toString() {
-    return '+2'
+    return '+2️'
   }
 }
 

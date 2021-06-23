@@ -1,4 +1,4 @@
-import { ws, MyEvent, Dialoguer, Cache, IRoomRes, PlayerData, Deferred, deferred, GameState, Card } from "../deps.ts"
+import { ws, MyEvent, Dialoguer, Cache, IRoomRes, PlayerData, Deferred, deferred, GameState, Card, readLines, CardFactory } from "../deps.ts"
 
 export async function joinRoom(id: string) {
 	console.clear()
@@ -36,11 +36,13 @@ export async function gamePage() {
 		// 游戏状态改变
 		ws.on(MyEvent.GameStateChange, (data) => {
 			loop.gameState = data
+			if (data === GameState.Start) console.clear()
 			loop.update()
 		}),
 		// 游戏玩家变化
 		ws.on(MyEvent.GamePlayer, (data) => {
-			loop.cards = data.cards
+			const cards: Card[] = data.cards.map(x => CardFactory.concretization(x))
+			loop.cards = cards
 			loop.update()
 		})
 	]
@@ -73,6 +75,7 @@ class GameLoop {
 	}
 
 	render() {
+		console.clear()
 		switch (this.gameState) {
 			case GameState.Ready: this.renderReadyState(); break;
 			case GameState.Start: this.renderGame(); break;
@@ -82,7 +85,7 @@ class GameLoop {
 	renderGame() {
 		console.log('Game')
 		this.cards.forEach(card => {
-			console.log(card.toString());
+			console.log(card.toStringUnicode());
 		})
 	}
 
@@ -104,9 +107,10 @@ class GameLoop {
 		if (!this._inputting) {
 			this._inputting = true
 			const buf = new Uint8Array(1024)
-			const read = () => {
-				Deno.stdin.read(buf).then(n => {
-					this._inputting = false
+			const read = async () => {
+				const n = await Deno.stdin.read(buf)
+				// Deno.stdin.read(buf).then(n => {
+				// 	this._inputting = false
 					if (n !== null) {
 						const str = new TextDecoder().decode(buf.subarray(0, n)).trim()
 						switch (str) {
@@ -114,7 +118,7 @@ class GameLoop {
 							default: Dialoguer.tty.text(`Invalid command: ${str}\n`); read();
 						}
 					}
-				})
+				// })
 			}
 			read()
 		}
