@@ -1,11 +1,15 @@
-import { IRoomReq, IRoomRes, PlayerData } from "../../deps.ts"
+import { Card, GameState, IRoomReq, IRoomRes, PlayerData } from "../../deps.ts"
 export enum MyEvent {
 	Login,
 	CreateRoom,
 	GetRoomList,
 	JoinRoom,
 	ExitRoom,
+	// PUSH
 	PlayerJoinRoom,
+	PlayerExitRoom,
+	GameStateChange,
+	GamePlayer,
 }
 
 // 事件参数定义
@@ -32,13 +36,16 @@ interface EventDataDefine {
  */
 export interface ResponseEventDataDefine {
 	[MyEvent.Login]: Result
-	[MyEvent.CreateRoom]: ResultFail | { players?: Record<string, PlayerData> } & ResultSucc
+	[MyEvent.CreateRoom]: Result & { roomid: string }
 	[MyEvent.GetRoomList]: {
 		list: IRoomRes[]
 		no: number
 		max: number
 	},
-	[MyEvent.JoinRoom]: ResultFail | { players?: Record<string, PlayerData> } & ResultSucc
+	[MyEvent.JoinRoom]: ResultType<{
+		players: Record<string, PlayerData>
+		roomData: IRoomRes
+	}>
 }
 type test = ResponseData<MyEvent.JoinRoom>
 /**
@@ -50,7 +57,16 @@ export interface PushDataDefine{
 		sockid: string
 	}
 	[MyEvent.PlayerJoinRoom]: {
-		playerData: PlayerData,
+		playerData: PlayerData
+		roomData: Pick<IRoomRes, 'count'>
+	}
+	[MyEvent.PlayerExitRoom]: {
+		playerData: Pick<PlayerData, '_sockid'>
+		roomData: Pick<IRoomRes, 'count'>
+	}
+	[MyEvent.GameStateChange]: GameState
+	[MyEvent.GamePlayer]: {
+		cards: Card[]
 	}
 }
 
@@ -69,3 +85,4 @@ export type PushData<T> = T extends MyEvent & keyof PushDataDefine
 type Result = { succ: boolean }
 type ResultSucc = { succ: true }
 type ResultFail = { succ: false }
+type ResultType<T> = Result & Partial<T>

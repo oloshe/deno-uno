@@ -8,6 +8,7 @@ export interface IRoomRes extends IRoomReq {
 	id: string
 	count: number
 	createTime: number
+	ownerId: string
 }
 
 

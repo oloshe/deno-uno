@@ -1,5 +1,5 @@
 import { MyEvent, ReqData, EventData, WebSocket, v4, UserState, ResponseEventDataDefine, ResponseData } from "../deps.ts"
-import { addRoomList, getRoomList, setPlayer, userExitRoom, userJoinRoom, getRoomPlayers } from "./cache.ts"
+import { addRoomList, getRoomList, setPlayer, userExitRoom, userJoinRoom, getRoomPlayers, getRoomById, roomStart } from "./cache.ts"
 import { Logger } from "./logger.ts";
 
 export function handleEvent<T extends MyEvent>(
@@ -18,10 +18,11 @@ export function handleEvent<T extends MyEvent>(
 				id,
 				createTime: Date.now(),
 				count: 0,
+				ownerId: sockid,
 			});
 			// 加入房间
 			const succ = userJoinRoom(sockid, id)
-			respond(MyEvent.CreateRoom, { succ, players: succ ? getRoomPlayers(id) : void 0 })
+			respond(MyEvent.CreateRoom, { succ, roomid: id })
 			break;
 		}
 		case MyEvent.GetRoomList: {
@@ -39,7 +40,16 @@ export function handleEvent<T extends MyEvent>(
 		case MyEvent.JoinRoom: {
 			const _data = type<MyEvent.JoinRoom>(data)
 			const succ = userJoinRoom(sockid, _data.id)
-			respond(MyEvent.JoinRoom, { succ, players: succ ? getRoomPlayers(_data.id) : void 0 })
+			const players = getRoomPlayers(_data.id)
+			const roomData = getRoomById(_data.id)
+			respond(MyEvent.JoinRoom, {
+				succ,
+				players,
+				roomData,
+			})
+			if (roomData && roomData.count === roomData.max) {
+				roomStart(roomData.id, players)
+			}
 			break;
 		}
 		case MyEvent.ExitRoom: {

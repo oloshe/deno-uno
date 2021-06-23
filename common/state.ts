@@ -3,3 +3,8 @@ export enum UserState {
 	Ready,
 	Offline,
 }
+
+export enum GameState {
+	Ready,
+	Start,
+}

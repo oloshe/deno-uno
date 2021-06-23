@@ -84,14 +84,14 @@ const createRoom = async () => {
 	const name = inputName.trim()
 	const inputNum = await Dialoguer.Select({
 		title: 'what is the maximun number of people',
-		items: ['3', '4', '5', '6', '7', '8'],
+		items: ['2', '3', '4', '5', '6', '7', '8', '9', '10'],
 	})
 	const max = parseInt(inputNum)
 	const ret = await ws.sendFuture(MyEvent.CreateRoom, {
 		name, max, owner: playerUser.name
 	})
 	if (ret.succ) {
-		await gamePage()
+		await joinRoom(ret.roomid)
 	} else {
 		console.log('create room fail')
 		await new Keypress()

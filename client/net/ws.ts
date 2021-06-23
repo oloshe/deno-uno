@@ -1,6 +1,6 @@
 
 
-import { MyEvent, EventData, ResponseData, ReqData, ResponseEventDataDefine, PushData, Dialoguer, playerUser } from "../../deps.ts"
+import { MyEvent, EventData, ResponseData, ReqData, ResponseEventDataDefine, PushData, Dialoguer, playerUser, Cache } from "../../deps.ts"
 import { mainMenu } from "../menu.ts";
 
 let _websocket: WebSocket
@@ -56,6 +56,7 @@ export function createWebsocket(host: string, port: string) {
 			}
 			// console.log('[ws.onmessage]', _rawdata)
 			const { func, data } = _rawdata;
+			Cache.set(func, data)
 			const cbData = dataCallback.get(func)
 			if (cbData) {
 				const filterCbData = cbData.filter(itm => {
@@ -76,26 +77,28 @@ export function createWebsocket(host: string, port: string) {
 			mainMenu()
 		}
 		_websocket.onerror = function (_) {
-			console.error('connect error')
 			_websocket.close()
 		}
 		_websocket.onclose = async () => {
-			console.error('lost connection!')
 			!_preventReconnect && await reconnect()
 		}
 	})
 }
 
 export const login = async () => {
-	while (1) {
-		const ret = await (await Dialoguer.Input({ title: 'please input a nick' })).trim()
+	while (true) {
+		let ret
+		do {
+			ret = await Dialoguer.Input({ title: 'please input a nick' })
+			ret = ret.trim()
+		} while(!ret)
 		const resp = await ws.sendFuture(MyEvent.Login, { nick: ret })
 		console.log(resp.succ)
 		if (resp.succ) {
 			playerUser.setName(ret)
 			break
 		} else {
-			console.log(`it's a duplicate nick, please try again!`)
+			console.log(`login fail, please try again!`)
 		}
 	}
 }
@@ -138,7 +141,7 @@ export function preventReconnect() {
 	_preventReconnect = true
 }
 export async function checkConnection() {
-	if (_websocket.readyState === _websocket.CONNECTING) {
+	if (_websocket.readyState !== _websocket.OPEN) {
 		await reconnect()
 	} else {
 		_preventReconnect = false
@@ -154,6 +157,10 @@ export class ws {
 		}
 		// console.log(event, callback)
 		callback && addCallback(event, callback, true);
+		if (_websocket.readyState !== _websocket.OPEN) {
+			console.error('socket is not open');
+			return
+		}
 		_websocket.send(JSON.stringify(_transData))
 	}
 
@@ -181,10 +188,10 @@ class ppChecker {
 		return this
 	}
 	static start() {
-		console.log('ping')
-		_websocket.send('0')
-		this._timeoutId = setTimeout(() => {
-			_websocket?.close()
-		}, this._timeout)
+		// console.log('ping')
+		// _websocket.send('0')
+		// this._timeoutId = setTimeout(() => {
+		// 	_websocket?.close()
+		// }, this._timeout)
 	}
 }

@@ -1,7 +1,7 @@
-import { IRoomRes, UserState, PlayerData, MyEvent, ResponseData, PushData } from "../deps.ts"
+import { IRoomRes, UserState, PlayerData, MyEvent, ResponseData, PushData, GameState } from "../deps.ts"
 import { WebSocket } from "../deps.ts"
 import { Logger } from "./logger.ts";
-
+import { PM } from "./processMgr.ts";
 
 // 房间列表
 const roomList: IRoomRes[] = []
@@ -13,6 +13,8 @@ const players: Record<sockid, PlayerData> = {}
 const connections: Record<sockid, WebSocket> = {}
 
 const roomPlayers: Record<roomid, Record<sockid, PlayerData>> = {}
+
+const gameProcess: Record<roomid, PM> = {}
 
 type sockid = string
 type roomid = string
@@ -45,11 +47,7 @@ export function getPlayerBySockId<T extends keyof PlayerData>(sid: sockid, field
 	return field ? data[field] : data
 }
 export function setPlayerDataBySockId<T extends keyof PlayerData>(sid: sockid, field: T, data: PlayerData[T]) {
-	try {
-		players[sid][field] = data
-	} catch (e) {
-		console.error(e)
-	}
+	players[sid] && (players[sid][field] = data)
 }
 
 
@@ -87,11 +85,18 @@ export function roomPlayerForEach(
 	return rp
 }
 export function setRoomPlayers(roomid: roomid, sockid: sockid) {
-	return roomPlayerForEach(roomid,{
+	let len: number;
+	return roomPlayerForEach(roomid, {
+		before: (data) => {
+			len = Object.keys(data).length + 1
+		},
 		callback: (_, sid) => {
 			// 广播玩家进入
 			sendBySockId(MyEvent.PlayerJoinRoom, sid, {
-				playerData: getPlayer(sockid)
+				playerData: getPlayer(sockid),
+				roomData: {
+					count: len
+				}
 			})
 		},
 		after: data => {
@@ -101,14 +106,19 @@ export function setRoomPlayers(roomid: roomid, sockid: sockid) {
 	})
 }
 export function removeRoomPlayer(roomid: roomid, sockid: sockid) {
+	let len: number
 	return roomPlayerForEach(roomid, {
 		before: (data) => {
 			// 删除该玩家
 			delete data[sockid]
+			len = Object.keys(data).length
 		},
 		callback: (_, sid) => {
 			// 广播房间内玩家
-			sendBySockId(MyEvent.ExitRoom, sid, { sockid: sid })
+			sendBySockId(MyEvent.PlayerExitRoom, sid, {
+				playerData: { _sockid: sockid },
+				roomData: { count: len }
+			})
 		}
 	})
 }
@@ -142,8 +152,8 @@ export function userJoinRoom(sockid: sockid, roomid: string) {
 }
 export function userExitRoom(sid: sockid) {
 	const { roomid } = getPlayerBySockId(sid)
-	setPlayerDataBySockId(sid, 'roomid', null);
 	if (roomid) {
+		setPlayerDataBySockId(sid, 'roomid', null);
 		// 移除玩家
 		removeRoomPlayer(roomid, sid)
 		const room = getRoomById(roomid)
@@ -152,6 +162,26 @@ export function userExitRoom(sid: sockid) {
 		}
 	}
 }
+
+
+export function roomStart(roomid: roomid, players: Record<string, unknown>) {
+	const pm = new PM(players)
+	gameProcess[roomid] = pm
+	roomPlayerForEach(roomid, {
+		callback: (_, sid) => {
+			sendBySockId(MyEvent.GameStateChange, sid, GameState.Start
+			)
+			sendBySockId(MyEvent.GamePlayer, sid, {
+				cards: pm.players[sid]
+			})
+		}
+	})
+}
+export function getRoomProcess(roomid: roomid): PM | null {
+	return gameProcess[roomid] || null
+}
+
+
 
 export function addConnection(uid: string, sock: WebSocket) {
 	connections[uid] = sock
