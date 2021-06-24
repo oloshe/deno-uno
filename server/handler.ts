@@ -1,5 +1,5 @@
 import { MyEvent, ReqData, EventData, WebSocket, v4, UserState, ResponseEventDataDefine, ResponseData } from "../deps.ts"
-import { addRoomList, getRoomList, setPlayer, userExitRoom, userJoinRoom, getRoomPlayers, getRoomById, roomStart } from "./cache.ts"
+import { addRoomList, getRoomList, setPlayer, userExitRoom, userJoinRoom, getRoomPlayers, getRoomById, roomStart, getPlayerBySockId, getRoomProcess, sendBySock, roomPlayerForEach, sendBySockId } from "./cache.ts"
 import { Logger } from "./logger.ts";
 
 export function handleEvent<T extends MyEvent>(
@@ -55,6 +55,53 @@ export function handleEvent<T extends MyEvent>(
 		case MyEvent.ExitRoom: {
 			// 用户离开房间
 			userExitRoom(sockid)
+			break;
+		}
+		case MyEvent.PlayCard: {
+			const { index, color } = type<MyEvent.PlayCard>(data)
+			const roomid = getPlayerBySockId(sockid, 'roomid')
+			if (!roomid) { return }
+			const pm = getRoomProcess(roomid)
+			const succ = pm?.playCard(sockid, index, color) ?? false
+			console.log('[play]', succ)
+			respond(MyEvent.PlayCard, { succ })
+			if (succ && pm) {
+				roomPlayerForEach(roomid, {
+					callback: (_, sid) => {
+						sendBySockId(MyEvent.GameMeta, sid, {
+							turn: pm.getTurnPlayerId(),
+							clockwise: pm.clockwise,
+							color: pm.currentColor,
+							plus: pm.currentPlus,
+							cardNum: pm.cardNum,
+							lastCard: pm.lastCard!,
+							cards: sid === sockid ? pm.players[sockid] : void 0,
+						})
+					}
+				})
+			}
+			break;
+		}
+		case MyEvent.DrawCard: {
+			const roomid = getPlayerBySockId(sockid, 'roomid')
+			if (!roomid) return
+			const pm = getRoomProcess(roomid)
+			const succ = pm?.drawCard(sockid) ?? false
+			respond(MyEvent.DrawCard, { succ })
+			console.log('[draw]', succ)
+			if (succ && pm) {
+				roomPlayerForEach(roomid, {
+					callback: (_, sid) => {
+						sendBySockId(MyEvent.GameMeta, sid, {
+							cards: sid === sockid ? pm.players[sockid] : void 0,
+							cardNum: pm.cardNum,
+							plus: pm.currentPlus,
+							lastCard: pm.lastCard,
+							color: pm.currentColor,
+						})
+					}
+				})
+			}
 			break;
 		}
 		default: break;

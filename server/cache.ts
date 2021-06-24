@@ -171,11 +171,12 @@ export function roomStart(roomid: roomid, players: Record<string, unknown>) {
 		callback: (_, sid) => {
 			const sock = getSockById(sid)
 			sendBySock(MyEvent.GameStateChange, sock, GameState.Start)
-			sendBySock(MyEvent.GameInit, sock, {
+			sendBySock(MyEvent.GameMeta, sock, {
 				cards: pm.players[sid],
 				color: pm.currentColor,
-				turn: pm.turn,
-				direction: pm.direction,
+				turn: Object.keys(pm.players)[pm.turn],
+				clockwise: pm.clockwise,
+				cardNum: pm.cardNum,
 				gameStatus: GameState.Start,
 			})
 		}

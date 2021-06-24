@@ -1,4 +1,4 @@
-import { Card, CardColor, CardDirection, GameState, IRoomReq, IRoomRes, PlayerData } from "../../deps.ts"
+import { Card, CardColor, GameState, IRoomReq, IRoomRes, PlayerData } from "../../deps.ts"
 export enum MyEvent {
 	Login,
 	CreateRoom,
@@ -10,16 +10,12 @@ export enum MyEvent {
 	PlayerExitRoom,
 	/** 游戏状态改变 */
 	GameStateChange,
-	/** 游戏初始化数据 */
-	GameInit,
-	/** 牌变化 */
-	MyCard,
-	/** 轮到谁 */
-	TurnTo,
-	/** 牌方向 */
-	CardDirection,
-	/** 卡牌颜色变化 */
-	CardColorChange,
+	/** 游戏一些基础数据 */
+	GameMeta,
+	/** 出牌 */
+	PlayCard,
+	/** 抽牌 */
+	DrawCard,
 }
 
 // 事件参数定义
@@ -37,7 +33,11 @@ interface EventDataDefine {
 	[MyEvent.JoinRoom]: {
 		id: string
 	}
-
+	[MyEvent.PlayCard]: {
+		index: number,
+		color?: CardColor // 出万能牌的时候要指定颜色
+	},
+	[MyEvent.DrawCard]: null
 }
 
 /**
@@ -56,6 +56,12 @@ export interface ResponseEventDataDefine {
 		players: Record<string, PlayerData>
 		roomData: IRoomRes
 	}>
+	[MyEvent.PlayCard]: {
+		succ: boolean
+	}
+	[MyEvent.DrawCard]: {
+		succ: boolean
+	}
 }
 type test = ResponseData<MyEvent.JoinRoom>
 /**
@@ -75,17 +81,16 @@ export interface PushDataDefine{
 		roomData: Pick<IRoomRes, 'count'>
 	}
 	[MyEvent.GameStateChange]: GameState
-	[MyEvent.GameInit]: {
+	[MyEvent.GameMeta]: Partial<{
 		turn: string
-		color: CardColor
-		direction: CardDirection
-		cards: Card[]
+		clockwise: boolean
+		color: number
+		plus: number
+		cardNum: number
 		gameStatus: GameState
-	}
-	[MyEvent.MyCard]: Card[]
-	[MyEvent.TurnTo]: string // 玩家id
-	[MyEvent.CardColorChange]: CardColor
-	[MyEvent.CardDirection]: CardDirection
+		lastCard: Card | null,
+		cards: Card[]
+	}>
 }
 
 export type EventData<T> = T extends MyEvent & keyof EventDataDefine

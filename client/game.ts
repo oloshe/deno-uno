@@ -1,4 +1,4 @@
-import { ws, MyEvent, Dialoguer, Cache, IRoomRes, PlayerData, Deferred, deferred, GameState, Card, readLines, CardFactory, CardColor, CardDirection } from "../deps.ts"
+import { ws, MyEvent, Dialoguer, Cache, IRoomRes, PlayerData, Deferred, deferred, GameState, Card, readLines, CardFactory, CardColor, colorMap } from "../deps.ts"
 
 export async function joinRoom(id: string) {
 	console.clear()
@@ -39,25 +39,25 @@ export async function gamePage() {
 			// if (data === GameState.Start) console.clear()
 			// loop.update()
 		}),
-		ws.on(MyEvent.GameInit, (data) => {
+		ws.on(MyEvent.GameMeta, (data) => {
 			const {
-				direction,
+				clockwise,
 				turn,
 				color,
 				cards,
+				plus,
+				cardNum,
 				gameStatus,
+				lastCard,
 			} = data
-			loop.cards = cards.map(x => CardFactory.concretization(x))
-			loop.currentColor = color
-			loop.turn = turn
-			loop.direction = direction
-			loop.gameState = gameStatus
-			loop.update()
-		}),
-		// 游戏玩家卡牌变化
-		ws.on(MyEvent.MyCard, (data) => {
-			const cards: Card[] = data.map(x => CardFactory.concretization(x))
-			loop.cards = cards
+			clockwise && (loop.clockwise = clockwise)
+			turn && (loop.turn = turn)
+			color && (loop.currentColor = color)
+			plus && (loop.currentPlus = plus)
+			cardNum && (loop.cardNum = cardNum)
+			gameStatus && (loop.gameState = gameStatus)
+			lastCard !== void 0 && (loop.lastCard = lastCard ? CardFactory.concretization(lastCard) : lastCard)
+			cards && (loop.cards = cards.map(x => CardFactory.concretization(x)))
 			loop.update()
 		})
 	]
@@ -75,11 +75,17 @@ export async function gamePage() {
 class GameLoop {
 	roomData: IRoomRes;
 	players: Record<string, PlayerData>
+	// 我自己的卡
 	cards: Card[] = []
+	// 卡牌堆里面的卡牌数量
+	cardNum = 107
+	lastCard: Card | null = null
+
 	gameState = GameState.Ready
 	currentColor: CardColor = CardColor.all
-	turn: string = ''
-	direction: CardDirection = CardDirection.Clockwise
+	currentPlus = 0
+	turn = ''
+	clockwise = true
 	myId: string = Cache.get(MyEvent.Login)!.userId
 
 	signal: Deferred<boolean>
@@ -95,40 +101,64 @@ class GameLoop {
 
 	render() {
 		console.clear()
-		console.log('game status', this.gameState)
+		// console.log('game status', this.gameState)
 		switch (this.gameState) {
 			case GameState.Ready: this.renderReadyState(); break;
 			case GameState.Start: this.renderGame(); break;
 		}
 	}
 
-	async renderGame() {
-		console.log('Game')
-		if (this.turn === this.myId) {
-			this.cards.forEach(card => {
+	exploreMyCard(filter?: (index: number, card: Card) => boolean) {
+		this.cards.forEach((card, index) => {
+			if (!filter || filter(index, card)) {
 				console.log(card.toStringUnicode());
-			})
+			}
+		})
+	}
+
+	async renderGame() {
+		console.log(`[card num:${this.cardNum}] [plus:${this.currentPlus}] [${this.clockwise ? 'clockwise' : 'anticlockwise'}] 
+		\r${this.lastCard ? this.lastCard.toStringUnicode() : ''} ${this.currentColor && this.currentColor !== CardColor.all ? colorMap[this.currentColor] : ''}`)
+		console.log('-------------------------')
+		if (this.turn === this.myId) {
+			this.exploreMyCard()
 		} else {
-			console.log(this.cards)
 			const select = await Dialoguer.Select({
 				title: 'please choose a card',
 				items: [...this.cards.map((x, index) => {
-					console.log(x.toString())
 					return {
 						name: x.toStringUnicode(),
-						value: 'card',
-						disabled: 
-							(() => {
-							if (this.currentColor === CardColor.all || x.color === CardColor.all) {
-								return false
-							}
-							return x.color !== this.currentColor
-						})()
+						value: index.toString(),
+						disabled: !x.judge(this.lastCard),
 					}
 				}), ...[
 					'draw a card',
 				]]
 			})
+			switch (select) {
+				case 'draw a card': ws.send(MyEvent.DrawCard, null); break;
+				default: {
+					const index = parseInt(select)
+					let color: CardColor | undefined
+					if (this.cards[index].color === CardColor.all) {
+						this.exploreMyCard((idx) => idx === index);
+						const ret = await Dialoguer.Select({
+							title: 'choose a color',
+							items: Object.keys(colorMap).map(key => {
+								return {
+									// @ts-ignore 
+									name: colorMap[key],
+									value: key
+								}
+							})
+						})
+						color = parseInt(ret) as CardColor
+					}
+					const ret = await ws.sendFuture(MyEvent.PlayCard, { index: parseInt(select), color });
+					if (!ret) this.update()
+					break;
+				} 
+			}
 		}
 	}
 

@@ -1,5 +1,5 @@
 
-import { CardType, Card, CardColor, SkipCard, Plus2Card, Plus4Card, NumberCard, ReverseCard, ColorSwitchCard, CardDirection } from "../deps.ts";
+import { CardType, Card, CardColor, SkipCard, Plus2Card, Plus4Card, NumberCard, ReverseCard, ColorSwitchCard } from "../deps.ts";
 
 export class PM {
 	static TOTAL_CARD_NUM = 107
@@ -29,22 +29,37 @@ export class PM {
 	players: Record<string, Card[]>
 	/** 所有卡牌 */
 	cards: Card[]
+
+	get cardNum() {
+		return this.cards.length
+	}
+
 	/** 轮到谁的回合 */
-	turn: string
+	turn: number
 	/** 方向 */
-	direction: CardDirection
+	clockwise: boolean
 	/** 当前出牌颜色 */
 	currentColor: CardColor
+	/** 当前是数字牌是的大小 */
+	currentValue = -1
+	/** 当前加了多少 */
+	currentPlus = 0
+	/** 当前牌的类型 */
+	lastCard: Card | null = null
+
+	/** 人数 */
+	_length: number
 
 	constructor(player: Record<string, unknown>) {
 		this.players = {}
-		const playerKey = Object.keys(player)
-		playerKey.forEach(key => this.players[key] = [])
+		const playerKeys = Object.keys(player)
+		this._length = playerKeys.length
+		playerKeys.forEach(key => this.players[key] = [])
 		this.cards = this.getInitialCard()
 		this.shuffle()
 		this.dealCards()
-		this.turn = playerKey[0]
-		this.direction = CardDirection.Clockwise
+		this.turn = 0
+		this.clockwise = true
 		this.currentColor = CardColor.all
 	}
 
@@ -154,16 +169,70 @@ export class PM {
 	dealCards(): void {
 		const playersCardsList = Object.keys(this.players).map(k => this.players[k]);
 		const len = playersCardsList.length, maxCount = this.DEAL_COUNT * len;
-		let count = 0, currIdx = 0;
-		this.cards.every((card) => {
-			playersCardsList[currIdx].push(card);
-			count++;
-			if (count >= maxCount) {
-				return false
-			}
-			currIdx++;
+		let currIdx = 0;
+		for (let i = 0; i < maxCount; i++) {
+			const card = this.cards.pop()!
+			playersCardsList[currIdx++].push(card);
 			if (currIdx >= len) { currIdx = 0 }
-			return true
-		})
+		}
+	}
+
+	getTurnPlayerId() {
+		return Object.keys(this.players)[this.turn]
+	}
+
+	playCard(uid: string, index: number, color?: CardColor) {
+		const cards = this.players[uid]
+		if (!cards) return false
+		const card = cards[index]
+		if (!card) return false
+
+		const ret = card.judge(this.lastCard)
+		if (!ret) return false
+
+		// 用户牌堆里去除该张牌
+		cards.splice(index, 1)
+
+		
+		if (card instanceof NumberCard) {
+			this.currentValue = card.value
+		} else if (card instanceof ReverseCard) {
+			this.clockwise = !this.clockwise
+		} else if (card instanceof Plus2Card) {
+			this.currentPlus += 2
+		} else if (card instanceof Plus4Card) {
+			this.currentPlus += 4
+		}
+
+		// 如果是万能牌会指定颜色
+		this.currentColor = color ?? card.color
+		
+		const step = card?.type === CardType.skip ? 2 : 1
+		this.nextTurn(step)
+		this.lastCard = card
+
+		return true
+	}
+
+	nextTurn(step: 1 | 2) {
+		const dir = this.clockwise ? 1 : -1
+		let nextTurn = this.turn + (dir * step)
+		if (nextTurn >= this._length) nextTurn = nextTurn % this._length
+		else if (nextTurn < 0) nextTurn = this._length - nextTurn
+		// 下一个人
+		this.turn = nextTurn
+	}
+
+	drawCard(sid: string) {
+		const player = this.players[sid]
+		if (!player) return false
+		const num = this.currentPlus === 0 ? 1 : this.currentPlus
+		const newCards = this.cards.splice(this.cards.length - 1 - num, num);
+		player.push(...newCards)
+		this.currentPlus = 0
+		this.lastCard = null
+		this.currentValue = -1
+		this.currentColor = CardColor.all
+		return true
 	}
 }
