@@ -149,6 +149,9 @@ export function userJoinRoom(sockid: sockid, roomid: string) {
 	if (!room) {
 		return false
 	} else {
+		if (room.count >= room.max) {
+			return false
+		}
 		// 设置用户房间
 		setPlayerDataBySockId(sockid, 'roomid', room.id)
 		// 设置房间玩家数据

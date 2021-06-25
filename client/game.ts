@@ -6,8 +6,10 @@ export async function joinRoom(id: string) {
 	if (ret.succ) {
 		await gamePage()
 	} else {
-		console.log('join room fail!');
+		console.log('join room fail!\npress any key to continue');
+		await new Keypress()
 	}
+	return !!ret.succ
 }
 
 export async function gamePage() {
@@ -57,6 +59,7 @@ export async function gamePage() {
 				gameStatus,
 				lastCard,
 				playersCardsNum,
+				winner,
 			} = data
 			clockwise !== void 0 && (loop.clockwise = clockwise)
 			turn !== void 0 && (loop.turn = turn)
@@ -64,6 +67,7 @@ export async function gamePage() {
 			plus !== void 0 && (loop.currentPlus = plus)
 			cardNum !== void 0 && (loop.cardNum = cardNum)
 			gameStatus !== void 0 && (loop.gameState = gameStatus)
+			winner !== void 0 && (loop.winner = winner)
 			playersCardsNum !== void 0 && Object.assign(loop.playersCardsNum, playersCardsNum)
 			lastCard !== void 0 && (loop.lastCard = lastCard ? CardFactory.concretization(lastCard) : lastCard)
 			cards !== void 0 && (loop.cards = cards.map(x => CardFactory.concretization(x)))
@@ -104,6 +108,7 @@ class GameLoop {
 	turn = ''
 	clockwise = true
 	myId: string = Cache.get(MyEvent.Login)!.userId
+	winner: string = ''
 
 	signal: Deferred<boolean>
 	_inputting = false
@@ -116,20 +121,45 @@ class GameLoop {
 		this.signal = deferred()
 	}
 
-	render() {
+	async render() {
 		// console.log('game status', this.gameState)
 		switch (this.gameState) {
-			case GameState.Ready: this.renderReadyState(); break;
-			case GameState.Start: this.renderGame(); break;
+			case GameState.Ready: await this.renderReadyState(); break;
+			case GameState.Start: await this.renderGame(); break;
+			case GameState.End: await this.renderGameEnd(); break;
 		}
 	}
 
 	exploreMyCard(filter?: (index: number, card: Card) => boolean) {
 		this.cards.forEach((card, index) => {
 			if (!filter || filter(index, card)) {
-				console.log('  ' + card.toColorString());
+				console.log('  ' + card.toColorString() + ' ' + visualColor(card.color),);
 			}
 		})
+	}
+
+	async renderGameEnd() {
+		console.clear()
+		console.log('Game Over')
+		console.log(`The winner is ${this.players[this.winner]?.nick}`);
+		console.log('press any key to continue');
+		await new Keypress()
+		this.resetData()
+		this.update()
+	}
+
+	resetData() {
+		// 重制游戏状态
+		this.gameState = GameState.Ready
+		// 删除离开的玩家
+		for (let id in this.players) {
+			const status = this.players[id].status
+			if (status === UserState.Leave || status === UserState.Offline) {
+				delete this.players[id]
+			} else {
+				this.players[id].status = UserState.Online
+			}
+		}
 	}
 
 	async renderGame() {
@@ -139,8 +169,8 @@ class GameLoop {
 			.body([[
 				this.cardNum,
 				this.currentPlus || 0,
-				this.clockwise ? 'yes' : 'no',
-				!this.lastCard ? 'empty' : this.lastCard.toColorString(this.currentColor),
+				this.clockwise ? Dialoguer.colors.bgWhite.black.underline('yes') : Dialoguer.colors.bgBlack.white.underline('no'),
+				!this.lastCard ? Dialoguer.colors.gray('empty') : this.lastCard.toColorString(this.currentColor),
 				visualColor(this.currentColor),
 			]])
 			.padding(2)
@@ -151,17 +181,19 @@ class GameLoop {
 		
 		let turnPeople = 'another'
 		Dialoguer.Table
-			.header(['nick', 'turn', 'cardNum', 'status'])
+			.header(['nick', 'turn', 'cardNum', 'uno', 'status'])
 			.body(Object.keys(this.players).map(key => {
 				const p = this.players[key]
 				const turn = this.turn === key ? 'yes' : ''
 				if (turn) {
 					turnPeople = p.nick
 				}
+				const num = this.playersCardsNum[key]
 				return [
 					p.nick,
 					turn,
-					this.playersCardsNum[key] || '',
+					num || '0',
+					num <= 1 ? 'UNO!' : '',
 					userStateMap[p.status] || '',
 				]
 			}))
@@ -175,17 +207,18 @@ class GameLoop {
 			this.exploreMyCard()
 			Dialoguer.tty.cursorNextLine(1).text(`wait for ${Dialoguer.colors.blue.underline(turnPeople)} to play card`).cursorNextLine(1);
 		} else {
+			const drawStr = 'draw a card'
+			const cardArr = this.cards.map((card, index) => {
+				return {
+					name: card.toColorString() + ' ' + visualColor(card.color),
+					value: index.toString(),
+					disabled: !card.judge(this.lastCard, this.currentColor),
+				}
+			})
+			const cmdArr = this.currentColor === CardColor.all ? [] : [drawStr]
 			const select = await Dialoguer.Select({
 				title: 'please choose a card',
-				items: [...this.cards.map((x, index) => {
-					return {
-						name: x.toColorString() + ' ' + visualColor(x.color),
-						value: index.toString(),
-						disabled: !x.judge(this.lastCard, this.currentColor),
-					}
-				}), ...[
-					'draw a card',
-				]]
+				items: [...cardArr, ...cmdArr],
 			})
 			switch (select) {
 				case 'draw a card': ws.send(MyEvent.DrawCard, null); break;

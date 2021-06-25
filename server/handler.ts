@@ -101,6 +101,8 @@ export function handleEvent<T extends MyEvent>(
 			console.log('[play]', succ)
 			respond(MyEvent.PlayCard, { succ })
 			if (succ && pm) {
+				const cardNum = pm.players[sockid].length
+				const winner = cardNum === 0 ? sockid : void 0
 				roomPlayerForEach(roomid, {
 					callback: (_, sid) => {
 						sendBySockId(MyEvent.GameMeta, sid, {
@@ -112,10 +114,15 @@ export function handleEvent<T extends MyEvent>(
 							lastCard: pm.lastCard!,
 							cards: sid === sockid ? pm.players[sockid] : void 0,
 							playersCardsNum: {
-								[sockid]: pm.players[sockid].length
-							}
+								[sockid]: cardNum
+							},
+							gameStatus: winner ? GameState.End : void 0,
+							winner,
 						})
-					}
+						winner
+							&& setPlayer(sid, { status: UserState.Online })
+							&& sendBySockId(MyEvent.RoomUserState, sid, [sid, UserState.Online])
+					},
 				})
 			}
 			break;

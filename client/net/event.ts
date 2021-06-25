@@ -69,7 +69,6 @@ export interface ResponseEventDataDefine {
 	}
 	[MyEvent.Ready]: Result
 }
-type test = ResponseData<MyEvent.JoinRoom>
 /**
  * 主动推送数据
  * 字段不可与 [ResponseEventDataDefine] 重复，否则会有bug
@@ -97,6 +96,7 @@ export interface PushDataDefine{
 		lastCard: Card | null
 		playersCardsNum: Record<string, number>
 		cards: Card[]
+		winner: string // id
 	}>
 	[MyEvent.RoomUserState]: [string, UserState]
 }

@@ -8,4 +8,5 @@ export enum UserState {
 export enum GameState {
 	Ready,
 	Start,
+	End,
 }

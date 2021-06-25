@@ -30,32 +30,17 @@ export enum CardType {
 	/** 变色牌 */
 	colorSwitch,
 }
-
-export const colorEmojiMap: Record<CardColor, string> = {
-	[CardColor.yellow]: "🟡",
-	[CardColor.red]: "🔴",
-	[CardColor.blue]: "🔵",
-	[CardColor.green]: "🟢",
-	[CardColor.all]: ''
-};
 export const colorFn = (color: CardColor, str: string) => {
+  if (str === '') str = ' '
 	switch(color){
-		case CardColor.yellow: return Dialoguer.colors.brightYellow.underline(str)
-		case CardColor.red: return Dialoguer.colors.brightRed.underline(str)
-		case CardColor.blue: return Dialoguer.colors.brightBlue.underline(str)
-		case CardColor.green: return Dialoguer.colors.brightGreen.underline(str)
-		case CardColor.all: return Dialoguer.colors.white.underline(str)
+		case CardColor.yellow: return Dialoguer.colors.bgWhite.yellow.underline(str)
+		case CardColor.red: return Dialoguer.colors.bgWhite.red.underline(str)
+		case CardColor.blue: return Dialoguer.colors.bgWhite.blue.underline(str)
+		case CardColor.green: return Dialoguer.colors.bgWhite.green.underline(str)
+		case CardColor.all: return Dialoguer.colors.bgBlack.white.underline(str)
 		default: return '';
 	}
 }
-const valueMap: Record<CardType, string> = {
-	[CardType.number]: "",
-	[CardType.plus2]: "➕2️⃣",
-	[CardType.reverse]: "🔄",
-	[CardType.skip]: "⤴️",
-	[CardType.plus4]: "➕4️⃣",
-	[CardType.colorSwitch]: "🎲",
-};
 export const colorNameMap: Record<CardColor, string> = {
 	[CardColor.yellow]: "yellow",
 	[CardColor.red]: "red",
@@ -64,21 +49,9 @@ export const colorNameMap: Record<CardColor, string> = {
 	// necessary
 	[CardColor.all]: 'all',
 }
-const numberMap: string[] = [
-	"0️⃣",
-	"1️⃣",
-	"2️⃣",
-	"3️⃣",
-	"4️⃣",
-	"5️⃣",
-	"6️⃣",
-	"7️⃣",
-	"8️⃣",
-	"9️⃣",
-];
-export function visualColor(color: CardColor | null) {
+export function visualColor(color: CardColor | undefined) {
 	let ret: string
-	if (color) {
+	if (color !== void 0) {
 		const str = colorNameMap[color]
 		ret = colorFn(color, str)
 	} else {
@@ -97,11 +70,6 @@ export abstract class Card {
 		this.color = color;
 	}
 	abstract toString(): string;
-	toStringUnicode() {
-		const colorFlag = colorEmojiMap[this.color] ? colorEmojiMap[this.color] + ' ' : '';
-		const valueFlag = this instanceof NumberCard ? numberMap[this.value] : valueMap[this.type];
-		return `${colorFlag}${valueFlag} `;
-	}
 	toColorString(color?: CardColor) {
 		const _color = color ?? this.color
 		return colorFn(_color, this.toString())

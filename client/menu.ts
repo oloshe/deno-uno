@@ -60,6 +60,7 @@ export const roomList = async (no = 1) => {
 		return {
 			name: `${rd.name} [owner:${rd.owner}] [${rd.count}/${rd.max}]`,
 			value: rd.id,
+			// disabled: rd.count >= rd.max
 		}
 	});
 	items.push(Dialoguer.selectDivider)
@@ -80,7 +81,10 @@ export const roomList = async (no = 1) => {
 		case 'prev page': await roomList(no - 1); break;
 		case 'create room': await createRoom(); break;
 		case 'back': break;
-		default: await joinRoom(selected);
+		default: {
+			const ret = await joinRoom(selected);
+			!ret && await roomList()
+		}
 	}
 }
 

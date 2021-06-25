@@ -220,9 +220,12 @@ export class PM {
 	nextTurn(step: number) {
 		if (!this.clockwise) step = -step;
 		let nextTurn = this.turn + step
+		// [0,1]  next: 2 >= 2  next = 2 % 2 = 0
 		if (nextTurn >= this._length) nextTurn = nextTurn % this._length
-		else if (nextTurn < 0) nextTurn = this._length - nextTurn
+		// [0,1]  next: -1 < 0  next = 2 + -1 = 1
+		else if (nextTurn < 0) nextTurn = this._length + nextTurn
 		// 下一个人
+		console.log('[turn]', nextTurn)
 		this.turn = nextTurn
 	}
 
