@@ -31,19 +31,39 @@ export enum CardType {
 	colorSwitch,
 }
 
-export const colorMap: Record<Exclude<CardColor, CardColor.all>, string> = {
-	[CardColor.blue]: "🔵 ",
-	[CardColor.green]: "🟢 ",
-	[CardColor.red]: "🔴 ",
-	[CardColor.yellow]: "🟡 ",
+export const colorEmojiMap: Record<CardColor, string> = {
+	[CardColor.yellow]: "🟡",
+	[CardColor.red]: "🔴",
+	[CardColor.blue]: "🔵",
+	[CardColor.green]: "🟢",
+	[CardColor.all]: ''
 };
-const valueMap: Record<Exclude<CardType, CardType.number>, string> = {
-	[CardType.plus2]: "➕ 2️⃣",
+export const colorFn = (color: CardColor, str: string) => {
+	switch(color){
+		case CardColor.yellow: return Dialoguer.colors.brightYellow.underline(str)
+		case CardColor.red: return Dialoguer.colors.brightRed.underline(str)
+		case CardColor.blue: return Dialoguer.colors.brightBlue.underline(str)
+		case CardColor.green: return Dialoguer.colors.brightGreen.underline(str)
+		case CardColor.all: return Dialoguer.colors.white.underline(str)
+		default: return '';
+	}
+}
+const valueMap: Record<CardType, string> = {
+	[CardType.number]: "",
+	[CardType.plus2]: "➕2️⃣",
 	[CardType.reverse]: "🔄",
 	[CardType.skip]: "⤴️",
-	[CardType.plus4]: "➕ 4️⃣",
+	[CardType.plus4]: "➕4️⃣",
 	[CardType.colorSwitch]: "🎲",
 };
+export const colorNameMap: Record<CardColor, string> = {
+	[CardColor.yellow]: "yellow",
+	[CardColor.red]: "red",
+	[CardColor.blue]: "blue",
+	[CardColor.green]: "green",
+	// necessary
+	[CardColor.all]: 'all',
+}
 const numberMap: string[] = [
 	"0️⃣",
 	"1️⃣",
@@ -56,6 +76,16 @@ const numberMap: string[] = [
 	"8️⃣",
 	"9️⃣",
 ];
+export function visualColor(color: CardColor | null) {
+	let ret: string
+	if (color) {
+		const str = colorNameMap[color]
+		ret = colorFn(color, str)
+	} else {
+		ret = 'empty'
+	}
+	return ret
+}
 /**
  * 卡牌
  */
@@ -68,13 +98,15 @@ export abstract class Card {
 	}
 	abstract toString(): string;
 	toStringUnicode() {
-		// @ts-ignore :)
-		const colorFlag = colorMap[this.color] ?? "";
-		const valueFlag = this instanceof NumberCard ? numberMap[this.value] : // @ts-ignore :)
-			valueMap[this.type];
-		return `${colorFlag}${valueFlag}`;
+		const colorFlag = colorEmojiMap[this.color] ? colorEmojiMap[this.color] + ' ' : '';
+		const valueFlag = this instanceof NumberCard ? numberMap[this.value] : valueMap[this.type];
+		return `${colorFlag}${valueFlag} `;
 	}
-	abstract judge(card: Card | null): boolean;
+	toColorString(color?: CardColor) {
+		const _color = color ?? this.color
+		return colorFn(_color, this.toString())
+	}
+	abstract judge(card: Card | null, color?: CardColor): boolean;
 }
 
 export class CardFactory {
@@ -114,14 +146,17 @@ export class NumberCard extends Card {
 		this.value = value;
 	}
 	toString() {
-		return `${this.value}`;
+		return `Number[${this.value}]`;
 	}
-	judge(card: Card | null) {
+	judge(card: Card | null, color?: CardColor) {
 		if (!card) return true
 		if (this.color === card.color) {
 			return true
 		}
 		if (card instanceof NumberCard && this.value === card.value) {
+			return true
+		}
+		if (card.color === CardColor.all && color === this.color) {
 			return true
 		}
 		return false
@@ -136,10 +171,15 @@ export class Plus2Card extends Card {
 		super(CardType.plus2, color);
 	}
 	toString() {
-		return "+2️";
+		return "Draw Two (+2)";
 	}
-	judge(card: Card | null) {
+	judge(card: Card | null, color?: CardColor) {
 		if (!card) return true
+		// 都是 +2 牌
+		if (card instanceof Plus2Card) return true
+		if (card.color === CardColor.all && color === this.color) {
+			return true
+		}
 		return this.color === card.color
 	}
 }
@@ -152,10 +192,14 @@ export class ReverseCard extends Card {
 		super(CardType.reverse, color);
 	}
 	toString() {
-		return "倒转";
+		return "Reverse";
 	}
-	judge(card: Card | null) {
+	judge(card: Card | null, color?: CardColor) {
 		if (!card) return true
+		if (card instanceof ReverseCard) return true
+		if (card.color === CardColor.all && color === this.color) {
+			return true
+		}
 		return this.color === card.color
 	}
 }
@@ -168,10 +212,14 @@ export class SkipCard extends Card {
 		super(CardType.skip, color);
 	}
 	toString() {
-		return `跳过`;
+		return `Skip`;
 	}
-	judge(card: Card | null) {
+	judge(card: Card | null, color?: CardColor) {
 		if (!card) return true
+		if (card instanceof SkipCard) return true
+		if (card.color === CardColor.all && color === this.color) {
+			return true
+		}
 		return this.color === card.color
 	}
 }
@@ -184,7 +232,7 @@ export class ColorSwitchCard extends Card {
 		super(CardType.colorSwitch, CardColor.all);
 	}
 	toString() {
-		return `变色`;
+		return `Wild`;
 	}
 	judge() {
 		return true
@@ -199,7 +247,7 @@ export class Plus4Card extends Card {
 		super(CardType.plus4, CardColor.all);
 	}
 	toString() {
-		return "+4";
+		return "Wild Draw Four (+4)";
 	}
 	judge() {
 		return true

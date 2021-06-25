@@ -1,3 +1,5 @@
+import { GameState } from "../deps.ts";
+
 export interface IRoomReq {
 	name: string
 	max: number
@@ -9,6 +11,7 @@ export interface IRoomRes extends IRoomReq {
 	count: number
 	createTime: number
 	ownerId: string
+	status: GameState,
 }
 
 

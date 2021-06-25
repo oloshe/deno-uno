@@ -1,4 +1,4 @@
-import { Select, Input, /*Number, */ tty, colors } from "../deps.ts"
+import { Select, Input, /*Number, */ tty, colors, Table, ansi } from "../deps.ts"
 // import { checkConnection, preventReconnect } from "./net/ws.ts";
 
 interface SelectItem {
@@ -10,6 +10,7 @@ interface SelectItem {
 export interface SelectOption {
 	title: string
 	items: Array<SelectItem | string>,
+	transform?: Parameters<typeof Select.prompt>[0]['transform']
 }
 
 interface InputOption {
@@ -26,6 +27,7 @@ interface InputOption {
 
 export class Dialoguer {
 	public static colors = colors
+	public static ansi = ansi
 	public static selectDivider = Select.separator('----------')
 	public static async Select(option: SelectOption) {
 		const ret = await this.SelectAsync(option)
@@ -35,6 +37,7 @@ export class Dialoguer {
 		return Select.prompt({
 			message: option.title,
 			options: option.items,
+			listPointer: this.colors.blue(">"),
 			keys: {
 				previous: ['w', 'up'],
 				next: ['s', 'down'],
@@ -60,6 +63,9 @@ export class Dialoguer {
 	// 	})
 	// 	return ret
 	// }
+	public static get Table() {
+		return new Table()
+	}
 	public static tty = tty({
 		stdout: Deno.stdout,
 		stdin: Deno.stdin,

@@ -1,4 +1,4 @@
 export const Constant = {
-	port: '20210',
-	host: 'localhost',
+	serverPort: '20210',
+	addr: 'localhost:20210',
 }

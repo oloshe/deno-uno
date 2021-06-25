@@ -1,10 +1,16 @@
-import { Card, CardColor, GameState, IRoomReq, IRoomRes, PlayerData } from "../../deps.ts"
+import { Card, CardColor, GameState, IRoomReq, IRoomRes, PlayerData, UserState } from "../../deps.ts"
 export enum MyEvent {
 	Login,
+	ChangeNick,
 	CreateRoom,
 	GetRoomList,
 	JoinRoom,
+	Ready,
 	ExitRoom,
+	/** 出牌 */
+	PlayCard,
+	/** 抽牌 */
+	DrawCard,
 	// PUSH
 	PlayerJoinRoom,
 	PlayerExitRoom,
@@ -12,10 +18,7 @@ export enum MyEvent {
 	GameStateChange,
 	/** 游戏一些基础数据 */
 	GameMeta,
-	/** 出牌 */
-	PlayCard,
-	/** 抽牌 */
-	DrawCard,
+	RoomUserState,
 }
 
 // 事件参数定义
@@ -23,6 +26,7 @@ interface EventDataDefine {
 	[MyEvent.Login]: {
 		nick: string
 	}
+	[MyEvent.ChangeNick]: string
 	[MyEvent.CreateRoom]: IRoomReq,
 	[MyEvent.GetRoomList]: {
 		/** 页码 */
@@ -46,6 +50,7 @@ interface EventDataDefine {
  */
 export interface ResponseEventDataDefine {
 	[MyEvent.Login]: Result & { userId: string }
+	[MyEvent.ChangeNick]: Result
 	[MyEvent.CreateRoom]: Result & { roomid: string }
 	[MyEvent.GetRoomList]: {
 		list: IRoomRes[]
@@ -62,6 +67,7 @@ export interface ResponseEventDataDefine {
 	[MyEvent.DrawCard]: {
 		succ: boolean
 	}
+	[MyEvent.Ready]: Result
 }
 type test = ResponseData<MyEvent.JoinRoom>
 /**
@@ -88,9 +94,11 @@ export interface PushDataDefine{
 		plus: number
 		cardNum: number
 		gameStatus: GameState
-		lastCard: Card | null,
+		lastCard: Card | null
+		playersCardsNum: Record<string, number>
 		cards: Card[]
 	}>
+	[MyEvent.RoomUserState]: [string, UserState]
 }
 
 export type EventData<T> = T extends MyEvent & keyof EventDataDefine

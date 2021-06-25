@@ -1,5 +1,5 @@
-import { MyEvent, ReqData, EventData, WebSocket, v4, UserState, ResponseEventDataDefine, ResponseData } from "../deps.ts"
-import { addRoomList, getRoomList, setPlayer, userExitRoom, userJoinRoom, getRoomPlayers, getRoomById, roomStart, getPlayerBySockId, getRoomProcess, sendBySock, roomPlayerForEach, sendBySockId } from "./cache.ts"
+import { MyEvent, ReqData, EventData, WebSocket, v4, UserState, ResponseEventDataDefine, ResponseData, GameState } from "../deps.ts"
+import { addRoomList, getRoomList, setPlayer, userExitRoom, userJoinRoom, getRoomPlayers, getRoomById, roomStart, getPlayerBySockId, getRoomProcess, roomPlayerForEach, sendBySockId, getRoomPlayer, addPlayer } from "./cache.ts"
 import { Logger } from "./logger.ts";
 
 export function handleEvent<T extends MyEvent>(
@@ -19,6 +19,7 @@ export function handleEvent<T extends MyEvent>(
 				createTime: Date.now(),
 				count: 0,
 				ownerId: sockid,
+				status: GameState.Ready,
 			});
 			// 加入房间
 			const succ = userJoinRoom(sockid, id)
@@ -33,8 +34,16 @@ export function handleEvent<T extends MyEvent>(
 		case MyEvent.Login: {
 			const _data = data as EventData<MyEvent.Login>
 			Logger.log(`[login]`, _data.nick)
-			const succ = setPlayer(_data.nick, UserState.Online, sockid)
-			respond(MyEvent.Login, { succ, userId: sockid });
+			addPlayer(sockid, { nick: _data.nick, status: UserState.Online, _sockid: sockid })
+			respond(MyEvent.Login, { succ: true, userId: sockid });
+			break;
+		}
+		case MyEvent.ChangeNick: {
+			const _data = type<MyEvent.ChangeNick>(data)
+			const succ = setPlayer(sockid, {
+				nick: _data
+			})
+			respond(MyEvent.ChangeNick, { succ })
 			break;
 		}
 		case MyEvent.JoinRoom: {
@@ -47,9 +56,35 @@ export function handleEvent<T extends MyEvent>(
 				players,
 				roomData,
 			})
-			if (roomData && roomData.count === roomData.max) {
-				roomStart(roomData.id, players)
+			break;
+		}
+		case MyEvent.Ready: {
+			const roomid = getPlayerBySockId(sockid).roomid
+			let succ = true
+			if (roomid) {
+				const player = getRoomPlayer(roomid, sockid)
+				if (player) {
+					player.status = UserState.Ready
+					roomPlayerForEach(roomid, {
+						callback(_, sid) {
+							sendBySockId(MyEvent.RoomUserState, sid, [player._sockid, player.status])
+						},
+						after(datas) {
+							const roomData = getRoomById(roomid)
+							if (!roomData) return
+							// 满人且所有玩家准备，则开始游戏
+							if (roomData.count !== roomData.max) return
+							const everybodyReady = Object.keys(datas).every(key => datas[key].status === UserState.Ready)
+							everybodyReady && roomStart(roomid, datas)
+						}
+					})
+				} else {
+					succ = false
+				}
+			} else {
+				succ = false
 			}
+			respond(MyEvent.Ready, { succ })
 			break;
 		}
 		case MyEvent.ExitRoom: {
@@ -76,6 +111,9 @@ export function handleEvent<T extends MyEvent>(
 							cardNum: pm.cardNum,
 							lastCard: pm.lastCard!,
 							cards: sid === sockid ? pm.players[sockid] : void 0,
+							playersCardsNum: {
+								[sockid]: pm.players[sockid].length
+							}
 						})
 					}
 				})
@@ -98,6 +136,9 @@ export function handleEvent<T extends MyEvent>(
 							plus: pm.currentPlus,
 							lastCard: pm.lastCard,
 							color: pm.currentColor,
+							playersCardsNum: {
+								[sockid]: pm.players[sockid].length
+							}
 						})
 					}
 				})

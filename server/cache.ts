@@ -20,16 +20,14 @@ type sockid = string
 type roomid = string
 
 
-
-export function setPlayer(nick: string, status: UserState, sockId: sockid) {
-	if (players[sockId]) {
+export function addPlayer(sockid: sockid, data: PlayerData) {
+	players[sockid] = data
+}
+export function setPlayer(sockId: sockid, data: Partial<PlayerData>) {
+	if (!players[sockId]) {
 		return false
 	} else {
-		players[sockId] = {
-			_sockid: sockId,
-			status,
-			nick: nick,
-		}
+		Object.assign(players[sockId], data)
 		return true
 	}
 }
@@ -63,6 +61,14 @@ export function getRoomList(no: number, num: number) {
 		list: roomList.slice(start, start + num),
 		no, max: Math.ceil(roomList.length / no)
 	}
+}
+export function delRoom(roomid: string) {
+	const idx = roomList.findIndex(x => x.id === roomid)
+	if (idx === -1) return false
+	roomList.splice(idx, 1)
+	delete roomPlayers[roomid]
+	delete gameProcess[roomid]
+	// userData ..
 }
 export function getRoomById(id: string) {
 	return roomList.find(x => x.id === id)
@@ -125,6 +131,9 @@ export function removeRoomPlayer(roomid: roomid, sockid: sockid) {
 export function getRoomPlayers(roomid: roomid) {
 	return roomPlayers[roomid] || {}
 }
+export function getRoomPlayer(roomid: roomid, sid: sockid) : PlayerData | null {
+	return getRoomPlayers(roomid)[sid] ?? null
+}
 
 
 export function userJoinRoom(sockid: sockid, roomid: string) {
@@ -158,7 +167,11 @@ export function userExitRoom(sid: sockid) {
 		removeRoomPlayer(roomid, sid)
 		const room = getRoomById(roomid)
 		if (room) {
-			room.count = Object.keys(getRoomPlayers(roomid)).length
+			const len = Object.keys(getRoomPlayers(roomid)).length
+			room.count = len
+			if (len === 0) {
+				delRoom(roomid)
+			}
 		}
 	}
 }
@@ -170,7 +183,6 @@ export function roomStart(roomid: roomid, players: Record<string, unknown>) {
 	roomPlayerForEach(roomid, {
 		callback: (_, sid) => {
 			const sock = getSockById(sid)
-			sendBySock(MyEvent.GameStateChange, sock, GameState.Start)
 			sendBySock(MyEvent.GameMeta, sock, {
 				cards: pm.players[sid],
 				color: pm.currentColor,
@@ -178,6 +190,10 @@ export function roomStart(roomid: roomid, players: Record<string, unknown>) {
 				clockwise: pm.clockwise,
 				cardNum: pm.cardNum,
 				gameStatus: GameState.Start,
+				playersCardsNum: Object.keys(pm.players).reduce<Record<string, number>>((p, cur) => {
+					p[cur] = pm.players[cur].length
+					return p
+				}, {})
 			})
 		}
 	})

@@ -1,6 +1,7 @@
 export enum UserState {
 	Online,
 	Ready,
+	Leave,
 	Offline,
 }
 

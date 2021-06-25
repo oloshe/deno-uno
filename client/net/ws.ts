@@ -1,12 +1,10 @@
 
 
-import { MyEvent, EventData, ResponseData, ReqData, ResponseEventDataDefine, PushData, Dialoguer, playerUser, Cache } from "../../deps.ts"
+import { MyEvent, EventData, ResponseData, ReqData, ResponseEventDataDefine, PushData, Dialoguer, playerUser, Cache, deferred } from "../../deps.ts"
 import { mainMenu } from "../menu.ts";
 
 let _websocket: WebSocket
-let lastestHost = '', lastestPort = ''
-let _preventReconnect = false
-let fork: ReturnType<typeof Deno.run>
+let lastestAddr = ''
 
 type dataCallbackFn<T> = ((data: ResponseData<T>) => void) | ((data: PushData<T>) => void)
 
@@ -37,55 +35,64 @@ function removeCallback<T extends MyEvent>(event: T, fn: dataCallbackFn<T>) {
 	})
 }
 
-export function createWebsocket(host: string, port: string) {
-	lastestHost = host
-	lastestPort = port
-	return new Promise((resolve, reject) => {
-		try {
-			_websocket = new WebSocket(`ws://${host}:${port}`)
-		} catch (e) {
-			console.log(e)
-			return reject(e)
+export function createWebsocket(addr: string) {
+	const signal = deferred<void>()
+	let connected = false
+	lastestAddr = addr
+	try {
+		_websocket = new WebSocket(`ws://${addr}`)
+	} catch (e) {
+		console.log(e)
+		return signal.reject()
+	}
+	console.clear()
+	console.log('connecting server...')
+	_websocket.onmessage = function (ev: MessageEvent) {
+		const _rawdata = JSON.parse(ev.data)
+		if (_rawdata === '1') {
+			// pong
 		}
+		// console.log('[ws.onmessage]', _rawdata)
+		const { func, data } = _rawdata;
+		Cache.set(func, data)
+		const cbData = dataCallback.get(func)
+		if (cbData) {
+			const filterCbData = cbData.filter(itm => {
+				// 执行回调
+				itm.cb(data)
+				return !itm.once
+			})
+			// 去除单次回调
+			filterCbData.length !== cbData.length && dataCallback.set(func, filterCbData)
+		}
+	}
+	_websocket.onopen = async () => {
+		signal.resolve()
+		connected = true
 		console.clear()
-		console.log('connecting server...')
-		_websocket.onmessage = function (ev: MessageEvent) {
-			const _rawdata = JSON.parse(ev.data)
-			if (_rawdata === '1') {
-				ppChecker.reset().start()
-			}
-			// console.log('[ws.onmessage]', _rawdata)
-			const { func, data } = _rawdata;
-			Cache.set(func, data)
-			const cbData = dataCallback.get(func)
-			if (cbData) {
-				const filterCbData = cbData.filter(itm => {
-					// 执行回调
-					itm.cb(data)
-					return !itm.once
-				})
-				// 去除单次回调
-				filterCbData.length !== cbData.length && dataCallback.set(func, filterCbData)
-			}
+		await login()
+		mainMenu()
+	}
+	_websocket.onerror = function (_) {
+		_websocket.close()
+	}
+	_websocket.onclose = () => {
+		console.clear()
+		console.log('lost connection');
+		if (connected) {
+			Deno.exit(1)
+		} else {
+			reconnect()
 		}
-		_websocket.onopen = async () => {
-			resolve(void 0)
-			_preventReconnect = false
-			console.clear()
-			ppChecker.reset().start()
-			await login()
-			mainMenu()
-		}
-		_websocket.onerror = function (_) {
-			_websocket.close()
-		}
-		_websocket.onclose = async () => {
-			!_preventReconnect && await reconnect()
-		}
-	})
+	}
+	return signal;
 }
 
 export const login = async () => {
+	Dialoguer.tty
+		.text('Welcome To ').link(Dialoguer.colors.brightBlue('DenoUno'), 'https://www.baidu.com')
+		.cursorNextLine.text(`please ensure your code page is 65001. use ${Dialoguer.colors.brightBlue('chcp')} to check it out.`)
+		.cursorNextLine(2)
 	while (true) {
 		let ret
 		do {
@@ -105,46 +112,29 @@ export const login = async () => {
 
 async function reconnect() {
 	console.clear()
-	console.error(`connect to ${lastestHost}:${lastestPort} failed, please check the server is running or contact with the admin.\n`)
+	console.error(`connect to ${lastestAddr} failed, please check the server is running or contact with the admin.\n`)
 
 	const ret = await Dialoguer.Select({
 		title: 'select',
 		items: [
 			'reconnect',
 			'change server address',
-			'create local server',
 			'exit'
 		]
 	})
 	if (ret === 'exit') {
 		Deno.exit(1)
 	} else if (ret === 'reconnect') {
-		await createWebsocket(lastestHost, lastestPort)
+		await createWebsocket(lastestAddr)
 	} else if (ret === 'change server address') {
-		const _host = (await Dialoguer.Input({ title: `please input address (e.g ${lastestHost})` })).trim()
-		const _port = (await Dialoguer.Input({ title: `please input port (e.g ${lastestPort})` })).trim()
-		await createWebsocket(_host, _port)
-	} else if (ret === 'create local server') {
-		fork = Deno.run({
-			cmd: ['deno', 'run', '--unstable', '--allow-net', 'server/server.ts'],
-			stdout: 'null',
-			stderr: 'null',
-		})
-		window.onunload = () => {
-			fork.kill(2)
-		}
+		const _addr = (await Dialoguer.Input({ title: `please input address` })).trim()
+		await createWebsocket(_addr)
 	}
 }
 
-
-export function preventReconnect() {
-	_preventReconnect = true
-}
 export async function checkConnection() {
 	if (_websocket.readyState !== _websocket.OPEN) {
 		await reconnect()
-	} else {
-		_preventReconnect = false
 	}
 }
 
@@ -180,18 +170,18 @@ export class ws {
 	}
 }
 
-class ppChecker {
-	static _timeout = 10000
-	static _timeoutId = 0
-	static reset() {
-		clearTimeout(this._timeoutId)
-		return this
-	}
-	static start() {
-		// console.log('ping')
-		// _websocket.send('0')
-		// this._timeoutId = setTimeout(() => {
-		// 	_websocket?.close()
-		// }, this._timeout)
-	}
-}
+// class ppChecker {
+// 	static _timeout = 10000
+// 	static _timeoutId = 0
+// 	static reset() {
+// 		clearTimeout(this._timeoutId)
+// 		return this
+// 	}
+// 	static start() {
+// 		// console.log('ping')
+// 		// _websocket.send('0')
+// 		// this._timeoutId = setTimeout(() => {
+// 		// 	_websocket?.close()
+// 		// }, this._timeout)
+// 	}
+// }

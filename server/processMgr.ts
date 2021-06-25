@@ -187,13 +187,13 @@ export class PM {
 		const card = cards[index]
 		if (!card) return false
 
-		const ret = card.judge(this.lastCard)
+		const ret = card.judge(this.lastCard, this.currentColor)
 		if (!ret) return false
 
 		// 用户牌堆里去除该张牌
 		cards.splice(index, 1)
 
-		
+		// const step = 1
 		if (card instanceof NumberCard) {
 			this.currentValue = card.value
 		} else if (card instanceof ReverseCard) {
@@ -202,21 +202,24 @@ export class PM {
 			this.currentPlus += 2
 		} else if (card instanceof Plus4Card) {
 			this.currentPlus += 4
+		} else if (card instanceof SkipCard) {
+			// 双人 玩家打出跳过牌后，可以继续打出下一张牌
+			// if (this._length === 2) step = 2
+			// else step = 1
 		}
 
 		// 如果是万能牌会指定颜色
-		this.currentColor = color ?? card.color
+		this.currentColor = color === void 0 ? card.color : color
 		
-		const step = card?.type === CardType.skip ? 2 : 1
-		this.nextTurn(step)
+		this.nextTurn(1)
 		this.lastCard = card
 
 		return true
 	}
 
-	nextTurn(step: 1 | 2) {
-		const dir = this.clockwise ? 1 : -1
-		let nextTurn = this.turn + (dir * step)
+	nextTurn(step: number) {
+		if (!this.clockwise) step = -step;
+		let nextTurn = this.turn + step
 		if (nextTurn >= this._length) nextTurn = nextTurn % this._length
 		else if (nextTurn < 0) nextTurn = this._length - nextTurn
 		// 下一个人

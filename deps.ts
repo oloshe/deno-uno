@@ -18,7 +18,11 @@ export {
 	Input,
 	Number,
 	tty,
-	colors
+	colors,
+	prompt,
+	Table,
+	Command,
+	ansi,
 } from "https://deno.land/x/cliffy@v0.19.2/mod.ts";
 
 export {

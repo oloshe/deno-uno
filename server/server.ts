@@ -31,7 +31,11 @@ export async function handleWs(sock: WebSocket) {
 			if (typeof ev === "string") {
 				if (ev === '0') { sock.send('1'); continue }
 				const _data: ReqData<never> = JSON.parse(ev)
-				handleEvent(_data, sock, sockid);
+				try {
+					handleEvent(_data, sock, sockid);
+				} catch (e) {
+					console.log(e)
+				}
 			}
 		}
 		Logger.log('[logout]', getPlayer(sockid)?.nick);
@@ -44,9 +48,10 @@ export async function handleWs(sock: WebSocket) {
 	}
 }
 
-export async function runServer(port = Constant.port) {
+export async function runServer(port = Constant.serverPort) {
 	Logger.log(`websocket server is running on :${port}`);
-	for await (const req of serve(`:${port}`)) {
+	const conn = serve(`:${port}`)
+	for await (const req of conn) {
 		const { conn, r: bufReader, w: bufWriter, headers } = req;
 		acceptWebSocket({
 			conn,

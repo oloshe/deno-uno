@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Deno",
-            "type": "node",
+            "type": "pwa-node",
             "request": "launch",
             "cwd": "${workspaceFolder}",
             "runtimeExecutable": "deno",
@@ -17,15 +17,10 @@
 				 "-A", 
 				 "--unstable", 
 				 "--allow-net", 
-				 "server/server.ts"
+				 "main.ts",
+				 "--server"
 			],
             "port": 9229
         },
-		{
-			"name": "Deno (Attach)",
-			"type": "node",
-			"request": "attach",
-			"port": 9229
-	  	}
     ]
 }
