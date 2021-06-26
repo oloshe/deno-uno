@@ -1,231 +1,236 @@
-import { IRoomRes, UserState, PlayerData, MyEvent, ResponseData, PushData, GameState } from "../deps.ts"
+import { IRoomRes, PlayerData, MyEvent, PushData, GameState } from "../deps.ts"
 import { WebSocket } from "../deps.ts"
 import { Logger } from "./logger.ts";
 import { PM } from "./processMgr.ts";
-
-// 房间列表
-const roomList: IRoomRes[] = []
-
-// key: sockid
-const players: Record<sockid, PlayerData> = {}
-
-// key: sockid
-const connections: Record<sockid, WebSocket> = {}
-
-const roomPlayers: Record<roomid, Record<sockid, PlayerData>> = {}
-
-const gameProcess: Record<roomid, PM> = {}
+import { ServerConf } from "./server.config.ts";
 
 type sockid = string
 type roomid = string
 
+export class Connection {
+	private static _data: Record<sockid, WebSocket | undefined> = {}
+	private static _count = 0;
 
-export function addPlayer(sockid: sockid, data: PlayerData) {
-	players[sockid] = data
-}
-export function setPlayer(sockId: sockid, data: Partial<PlayerData>) {
-	if (!players[sockId]) {
-		return false
-	} else {
-		Object.assign(players[sockId], data)
-		return true
+	static get(id: string): WebSocket | null {
+		return this._data[id] || null
 	}
-}
-export function getPlayer(sockid: sockid): PlayerData {
-	return players[sockid] || {}
-}
-export function delPlayer(nick: string) {
-	return delete players[nick]
-}
-
-export function getPlayerBySockId(sid: sockid): PlayerData;
-export function getPlayerBySockId<T extends keyof PlayerData>(sid: sockid, field: T): PlayerData[T];
-export function getPlayerBySockId<T extends keyof PlayerData>(sid: sockid, field?: T): PlayerData | PlayerData[T] {
-	const data = players[sid] || {}
-	return field ? data[field] : data
-}
-export function setPlayerDataBySockId<T extends keyof PlayerData>(sid: sockid, field: T, data: PlayerData[T]) {
-	players[sid] && (players[sid][field] = data)
-}
-
-
-
-export function addRoomList(data: IRoomRes) {
-	roomList.push(data)
-	roomPlayers[data.id] = {}
-	console.log('[new room]', data)
-}
-export function getRoomList(no: number, num: number) {
-	const start = (no - 1) * num
-	return {
-		list: roomList.slice(start, start + num),
-		no, max: Math.ceil(roomList.length / no)
-	}
-}
-export function delRoom(roomid: string) {
-	const idx = roomList.findIndex(x => x.id === roomid)
-	if (idx === -1) return false
-	roomList.splice(idx, 1)
-	delete roomPlayers[roomid]
-	delete gameProcess[roomid]
-	// userData ..
-}
-export function getRoomById(id: string) {
-	return roomList.find(x => x.id === id)
-}
-export function roomPlayerForEach(
-	roomid: roomid,
-	option: {
-		before?: (datas: Record<sockid, PlayerData>) => void,
-		callback: (data: PlayerData, sockid: sockid) => void,
-		after?: (datas: Record<sockid, PlayerData>) => void
-	}
-) {
-	const rp = roomPlayers[roomid];
-	if (!rp) return
-	option.before?.(rp)
-	Object.keys(rp).forEach(sid => {
-		option.callback(rp[sid], sid)
-	})
-	option.after?.(rp)
-	return rp
-}
-export function setRoomPlayers(roomid: roomid, sockid: sockid) {
-	let len: number;
-	return roomPlayerForEach(roomid, {
-		before: (data) => {
-			len = Object.keys(data).length + 1
-		},
-		callback: (_, sid) => {
-			// 广播玩家进入
-			sendBySockId(MyEvent.PlayerJoinRoom, sid, {
-				playerData: getPlayer(sockid),
-				roomData: {
-					count: len
-				}
-			})
-		},
-		after: data => {
-			// 设置值
-			data[sockid] = getPlayer(sockid)
-		}
-	})
-}
-export function removeRoomPlayer(roomid: roomid, sockid: sockid) {
-	let len: number
-	return roomPlayerForEach(roomid, {
-		before: (data) => {
-			// 删除该玩家
-			delete data[sockid]
-			len = Object.keys(data).length
-		},
-		callback: (_, sid) => {
-			// 广播房间内玩家
-			sendBySockId(MyEvent.PlayerExitRoom, sid, {
-				playerData: { _sockid: sockid },
-				roomData: { count: len }
-			})
-		}
-	})
-}
-export function getRoomPlayers(roomid: roomid) {
-	return roomPlayers[roomid] || {}
-}
-export function getRoomPlayer(roomid: roomid, sid: sockid) : PlayerData | null {
-	return getRoomPlayers(roomid)[sid] ?? null
-}
-
-
-export function userJoinRoom(sockid: sockid, roomid: string) {
-	const oldRoomid = getPlayerBySockId(sockid, 'roomid')
-	// 已经在房间内
-	if (oldRoomid && oldRoomid != roomid) {
-		// 房间内实际数据存在
-		if (getRoomPlayers(oldRoomid)[sockid]) {
+	static add(id: string, sock: WebSocket) {
+		if (this._data[id]) {
 			return false
+		} else {
+			++this._count
+			this._data[id] = sock
+			return true
 		}
 	}
-	const room = getRoomById(roomid)
-	if (!room) {
-		return false
-	} else {
-		if (room.count >= room.max) {
-			return false
-		}
-		// 设置用户房间
-		setPlayerDataBySockId(sockid, 'roomid', room.id)
-		// 设置房间玩家数据
-		setRoomPlayers(room.id, sockid)
-		// 房间存在
-		room.count = Object.keys(getRoomPlayers(roomid)).length
-		Logger.log('[join room]', roomid)
-		return true
+	static del(id: string) {
+		PlayerCollection.exitRoom(id)
+		PlayerCollection.del(id)
+		--this._count;
+		return delete this._data[id]
 	}
-}
-export function userExitRoom(sid: sockid) {
-	const { roomid } = getPlayerBySockId(sid)
-	if (roomid) {
-		setPlayerDataBySockId(sid, 'roomid', null);
-		// 移除玩家
-		removeRoomPlayer(roomid, sid)
-		const room = getRoomById(roomid)
-		if (room) {
-			const len = Object.keys(getRoomPlayers(roomid)).length
-			room.count = len
-			if (len === 0) {
-				delRoom(roomid)
+	static sendTo<T extends MyEvent>(event: T, sockid: sockid, data: PushData<T>) {
+		const sock = this.get(sockid)
+		if (sock) {
+			if (!sock.isClosed) {
+				sock.send(JSON.stringify({ func: event, data }))
 			}
 		}
 	}
 }
 
-
-export function roomStart(roomid: roomid, players: Record<string, unknown>) {
-	const pm = new PM(players)
-	gameProcess[roomid] = pm
-	roomPlayerForEach(roomid, {
-		callback: (_, sid) => {
-			const sock = getSockById(sid)
-			sendBySock(MyEvent.GameMeta, sock, {
-				cards: pm.players[sid],
-				color: pm.currentColor,
-				turn: Object.keys(pm.players)[pm.turn],
-				clockwise: pm.clockwise,
-				cardNum: pm.cardNum,
-				gameStatus: GameState.Start,
-				playersCardsNum: Object.keys(pm.players).reduce<Record<string, number>>((p, cur) => {
-					p[cur] = pm.players[cur].length
-					return p
-				}, {})
-			})
+export class PlayerCollection {
+	private static _data: Record<sockid, PlayerData | undefined> = {};
+	static get playerCount() {
+		return Object.keys(this._data).length
+	}
+	static add(id: sockid, data: PlayerData) {
+		this._data[id] = data;
+		return true
+	}
+	static set(id: sockid, data: Partial<PlayerData>) {
+		if (this._data[id]) {
+			Object.assign(this._data[id], data)
+			return true
+		} else {
+			return false
 		}
-	})
-}
-export function getRoomProcess(roomid: roomid): PM | null {
-	return gameProcess[roomid] || null
+	}
+	static get(id: sockid): PlayerData | null;
+	static get<T extends keyof PlayerData>(id: sockid, field: T): PlayerData[T] | null;
+	static get(id: sockid, field?: keyof PlayerData) {
+		const target = this._data[id]
+		if (!target) return null
+		else return field ? target[field] : this._data[id]
+	}
+	static del(id: sockid) {
+		delete this._data[id]
+	}
+	static joinRoom(sockid: sockid, roomid: roomid) {
+		const oldRoomid = PlayerCollection.get(sockid, 'roomid')
+		// 已经在房间内 && 房间内实际数据存在
+		if (oldRoomid && oldRoomid != roomid && Rooms.playerInThisRoom(oldRoomid, sockid)) {
+			return false
+		}
+		const room = Rooms.getRoom(roomid)
+		if (!room) { return false }
+
+		if (room.count >= room.max) { return false }
+		// 设置用户房间
+		PlayerCollection.set(sockid, { roomid: room.id })
+		Rooms.broadcastJoin(sockid, room)
+		return true
+	}
+	static exitRoom(sockid: sockid) {
+		const roomid = PlayerCollection.get(sockid, 'roomid')
+		if (!roomid) { return }
+		PlayerCollection.set(sockid, { roomid: null });
+		// 移除玩家
+		Rooms.broadcastExit(roomid, sockid)
+		const room = Rooms.getRoom(roomid), players = Rooms.getRoomPlayers(roomid);
+		if (room && players) {
+			const len = Object.keys(players).length
+			room.count = len
+			if (len === 0) {
+				Rooms.del(roomid)
+			}
+		}
+	}
 }
 
-
-
-export function addConnection(uid: string, sock: WebSocket) {
-	connections[uid] = sock
-}
-export function getSockById(sockid: sockid) {
-	return connections[sockid]
-}
-export function sendBySockId<T extends MyEvent>(event: T, sockid: sockid, data: PushData<T>) {
-	const sock = getSockById(sockid)
-	if (!sock) return
-	sendBySock(event, sock, data)
-}
-export function sendBySock<T extends MyEvent>(event: T, sock: WebSocket, data: PushData<T>) {
-	sock.send(JSON.stringify({
-		func: event,
-		data,
-	}))
-}
-export function delConnection(uid: string) {
-	userExitRoom(uid)
-	delete connections[uid]
-	delete players[uid]
+export class Rooms {
+	private static _roomList: IRoomRes[] = []
+	private static _roomPlayer: Record<roomid, Record<sockid, PlayerData | undefined> | undefined> = {}
+	private static _gameProcess: Record<roomid, PM> = {}
+	static get roomCount() {
+		return this._roomList.length
+	}
+	static add(roomData: IRoomRes) {
+		const roomid = roomData.id
+		this._roomList.push(roomData);
+		this._roomPlayer[roomid] = {}
+	}
+	static getRoom(roomid: roomid) {
+		return this._roomList.find(x => x.id === roomid)
+	}
+	static getList(no: number, num: number) {
+		const start = (no - 1) * num
+		return {
+			list: this._roomList.slice(start, start + num),
+			no, max: Math.ceil(this._roomList.length / no)
+		}
+	}
+	static getRoomPlayers(roomid: roomid) {
+		return this._roomPlayer[roomid]
+	}
+	static getRoomPlayer(roomid: roomid, sockid: sockid) {
+		return this.getRoomPlayers(roomid)?.[sockid]
+	}
+	static getGameProcess(sockid: sockid): PM | null {
+		return this._gameProcess[sockid] || null
+	}
+	static playerInThisRoom(sockid: sockid, roomid: roomid) {
+		return !!(this.getRoomPlayers(roomid)?.[sockid])
+	}
+	static setRoom(roomid: IRoomRes | roomid, data: Partial<IRoomRes>): boolean {
+		let room: IRoomRes | undefined
+		if (typeof roomid === 'string') {
+			room = this.getRoom(roomid)
+		} else {
+			room = roomid
+		}
+		if (!room) return false
+		Object.assign(room, data);
+		return true
+	}
+	static del(roomid: roomid) {
+		const idx = this._roomList.findIndex(x => x.id === roomid)
+		if (idx === -1) return false
+		this._roomList.splice(idx, 1)
+		delete this._roomPlayer[roomid]
+		delete this._gameProcess[roomid]
+	}
+	static roomBroadcast(
+		roomid: roomid,
+		option: {
+			before?: (datas: Record<sockid, PlayerData | undefined>) => void,
+			callback: (sockid: sockid, data: PlayerData) => void,
+			after?: (datas: Record<sockid, PlayerData | undefined>) => void
+		}
+	) {
+		const rp = this._roomPlayer[roomid];
+		if (!rp) return
+		option.before?.(rp)
+		Object.keys(rp).forEach(sid => {
+			const data = rp[sid];
+			data && option.callback(sid, data)
+		})
+		option.after?.(rp)
+		return rp
+	}
+	static broadcastJoin(id: string, roomData: IRoomRes) {
+		let len: number, playerData: PlayerData | null;
+		const roomid = roomData.id
+		this.roomBroadcast(roomid, {
+			before: (data) => {
+				len = Object.keys(data).length + 1;
+				playerData = PlayerCollection.get(id);
+			},
+			callback: (sid) => {
+				playerData && Connection.sendTo(MyEvent.PlayerJoinRoom, sid, {
+					playerData: playerData,
+					roomData: { count: len }
+				})
+			},
+			after: data => {
+				if (playerData) {
+					// 添加用户进入房间数据内
+					data[id] = playerData
+					// 房间存在
+					roomData && (roomData.count = Object.keys(data).length)
+					Logger.log('[join room]', roomid)
+				}
+			}
+		})
+	}
+	static broadcastExit(roomid: roomid, sockid: sockid) {
+		let len: number
+		return this.roomBroadcast(roomid, {
+			before: (data) => {
+				// 删除房间内该玩家数据
+				delete data[sockid]
+				len = Object.keys(data).length
+			},
+			callback: (sid) => {
+				// 广播房间内玩家
+				Connection.sendTo(MyEvent.PlayerExitRoom, sid, {
+					playerData: { _sockid: sockid },
+					roomData: { count: len }
+				})
+			},
+			after: () => {
+				this.getGameProcess(roomid)?.onUserLeave(sockid)
+			}
+		})
+	}
+	static roomStart(roomid: roomid, players: Record<string, unknown>) {
+		const pm = new PM(players)
+		this._gameProcess[roomid] = pm
+		this.roomBroadcast(roomid, {
+			callback: (sid) => {
+				Connection.sendTo(MyEvent.GameMeta, sid, {
+					cards: pm.players[sid],
+					color: pm.currentColor,
+					turn: Object.keys(pm.players)[pm.turn],
+					clockwise: pm.clockwise,
+					cardNum: pm.cardNum,
+					gameStatus: GameState.Start,
+					playersCardsNum: Object.keys(pm.players).reduce<Record<string, number>>((p, cur) => {
+						p[cur] = pm.players[cur].length
+						return p
+					}, {})
+				})
+			}
+		})
+	}
 }

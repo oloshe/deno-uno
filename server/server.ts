@@ -3,43 +3,41 @@ import { serve } from "https://deno.land/std@0.99.0/http/server.ts";
 import {
 	acceptWebSocket,
 	isWebSocketCloseEvent,
-	// isWebSocketPingEvent,
 	WebSocket,
 	ReqData,
 	v4,
-Constant
+	Constant
 } from "../deps.ts";
-import {
-	handleEvent
-} from "./handler.ts"
-import { addConnection, delConnection, getPlayer } from "./cache.ts"
+import { Connection } from "./cache.ts"
 import { Logger } from "./logger.ts"
+import { EventRouter } from "./eventRouter.ts";
 
 
 export async function handleWs(sock: WebSocket) {
 	Logger.log("socket connected!");
 	const sockid = v4.generate()
-	addConnection(sockid, sock)
+	Connection.add(sockid, sock)
+	const router = new EventRouter(sockid, sock);
 	try {
 		for await (const ev of sock) {
 			if (isWebSocketCloseEvent(ev)) {
-				// close.
 				const { code, reason } = ev;
-				Logger.log("ws:Close", code, reason);
-				break;
+				Logger.log("[ws::close]", code, reason);
 			}
 			if (typeof ev === "string") {
-				if (ev === '0') { sock.send('1'); continue }
-				const _data: ReqData<never> = JSON.parse(ev)
-				try {
-					handleEvent(_data, sock, sockid);
-				} catch (e) {
-					console.log(e)
+				if (ev === '0') {
+					sock.send('1');
+				} else {
+					const req: ReqData<never> = JSON.parse(ev)
+					try {
+						router.handle(req)
+					} catch (e) {
+						console.log(e)
+					}
 				}
 			}
 		}
-		Logger.log('[logout]', getPlayer(sockid)?.nick);
-		delConnection(sockid)
+		Connection.del(sockid)
 	} catch (err) {
 		Logger.error(`failed to receive frame: ${err}`);
 		if (!sock.isClosed) {

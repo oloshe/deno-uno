@@ -1,5 +1,6 @@
 
-import { CardType, Card, CardColor, SkipCard, Plus2Card, Plus4Card, NumberCard, ReverseCard, ColorSwitchCard } from "../deps.ts";
+import { CardType, Card, CardColor, SkipCard, Plus2Card, Plus4Card, NumberCard, ReverseCard, ColorSwitchCard, MyEvent, UserState, GameState } from "../deps.ts";
+import { Connection } from "./cache.ts";
 
 export class PM {
 	static TOTAL_CARD_NUM = 107
@@ -27,6 +28,10 @@ export class PM {
 
 	/** 玩家卡牌 */
 	players: Record<string, Card[]>
+
+	/** 离开的玩家 */
+	leavePlayers: Record<string, boolean> = {}
+
 	/** 所有卡牌 */
 	cards: Card[]
 
@@ -36,6 +41,8 @@ export class PM {
 
 	/** 轮到谁的回合 */
 	turn: number
+	turnPlayerId: string
+	
 	/** 方向 */
 	clockwise: boolean
 	/** 当前出牌颜色 */
@@ -48,17 +55,19 @@ export class PM {
 	lastCard: Card | null = null
 
 	/** 人数 */
-	_length: number
+	private get playerCount() {
+		return Object.keys(this.players).length
+	}
 
 	constructor(player: Record<string, unknown>) {
 		this.players = {}
 		const playerKeys = Object.keys(player)
-		this._length = playerKeys.length
 		playerKeys.forEach(key => this.players[key] = [])
 		this.cards = this.getInitialCard()
 		this.shuffle()
 		this.dealCards()
 		this.turn = 0
+		this.turnPlayerId = playerKeys[0]
 		this.clockwise = true
 		this.currentColor = CardColor.all
 	}
@@ -181,6 +190,41 @@ export class PM {
 		return Object.keys(this.players)[this.turn]
 	}
 
+	get leavePlayerCount() {
+		return Object.keys(this.leavePlayers).filter(key => this.leavePlayers[key]).length
+	}
+
+	onUserLeave(sockid: string) {
+		this.leavePlayers[sockid] = true
+		// 全部人都走只剩下 不用到下一轮了
+		if (this.playerCount === this.leavePlayerCount + 1) {
+			let winner: string | undefined
+			for (const id in this.players) {
+				if (!this.leavePlayers[id]) {
+					winner = id
+					break
+				}
+			}
+			winner && Connection.sendTo(MyEvent.GameMeta, winner, {
+				winner,
+				gameStatus: GameState.End,
+			})
+			return false
+		}
+		// 当前玩家出牌已经溜了， 所以轮到下一家出牌
+		if (this.turnPlayerId === sockid) {
+			this.nextTurn()
+			Object.keys(this.players).forEach(id => {
+				if (!this.leavePlayers[id]) {
+					Connection.sendTo(MyEvent.GameMeta, id, {
+						turn: this.turnPlayerId,
+					})
+				}
+			})
+		}
+		return true
+	}
+
 	playCard(uid: string, index: number, color?: CardColor) {
 		const cards = this.players[uid]
 		if (!cards) return false
@@ -204,7 +248,7 @@ export class PM {
 			this.currentPlus += 4
 		} else if (card instanceof SkipCard) {
 			// 双人 玩家打出跳过牌后，可以继续打出下一张牌
-			// if (this._length === 2) step = 2
+			// if (this.playerCount === 2) step = 2
 			// else step = 1
 		}
 
@@ -217,16 +261,21 @@ export class PM {
 		return true
 	}
 
-	nextTurn(step: number) {
+	nextTurn(step = 1) {
 		if (!this.clockwise) step = -step;
 		let nextTurn = this.turn + step
+		const lenth = this.playerCount
 		// [0,1]  next: 2 >= 2  next = 2 % 2 = 0
-		if (nextTurn >= this._length) nextTurn = nextTurn % this._length
+		if (nextTurn >= lenth) nextTurn = nextTurn % lenth
 		// [0,1]  next: -1 < 0  next = 2 + -1 = 1
-		else if (nextTurn < 0) nextTurn = this._length + nextTurn
+		else if (nextTurn < 0) nextTurn = lenth + nextTurn
 		// 下一个人
 		console.log('[turn]', nextTurn)
 		this.turn = nextTurn
+		const turnId = this.getTurnPlayerId()
+		this.turnPlayerId = turnId
+		// this user is leave, so it's not his turn
+		this.leavePlayers[turnId] && this.nextTurn(step)
 	}
 
 	drawCard(sid: string) {

@@ -1,5 +1,5 @@
-import { Dialoguer, playerUser, MyEvent, Keypress, ws, SelectOption } from "../deps.ts";
-import { gamePage, joinRoom } from "./game.ts"
+import { Dialoguer, playerUser, MyEvent, Keypress, ws, SelectOption, Cache } from "../deps.ts";
+import { joinRoom } from "./game.ts"
 
 export const mainMenu = async () => {
 	while (1) {
@@ -49,7 +49,8 @@ export const settingMenu = async () => {
 }
 
 export const myInfo = () => {
-	console.log(`hello ${playerUser.name} !`)
+	console.log(Dialoguer.colors.blue('~') +' Deno Uno')
+	console.log(`[nick: ${playerUser.name}]`)
 }
 
 export const roomList = async (no = 1) => {

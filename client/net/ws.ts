@@ -1,6 +1,7 @@
 
 
-import { MyEvent, EventData, ResponseData, ReqData, ResponseEventDataDefine, PushData, Dialoguer, playerUser, Cache, deferred } from "../../deps.ts"
+import { MyEvent, EventData, ResponseData, ReqData, ResponseEventDataDefine, PushData, Dialoguer, playerUser, Cache, deferred, Table, Cell } from "../../deps.ts"
+import { ClientConf } from "../client.config.ts";
 import { mainMenu } from "../menu.ts";
 
 let _websocket: WebSocket
@@ -49,8 +50,9 @@ export function createWebsocket(addr: string) {
 	console.log('connecting server...')
 	_websocket.onmessage = function (ev: MessageEvent) {
 		const _rawdata = JSON.parse(ev.data)
-		if (_rawdata === '1') {
-			// pong
+		if (_rawdata == 1) {
+			ppChecker.reset().start()
+			return
 		}
 		// console.log('[ws.onmessage]', _rawdata)
 		const { func, data } = _rawdata;
@@ -69,6 +71,7 @@ export function createWebsocket(addr: string) {
 	_websocket.onopen = async () => {
 		signal.resolve()
 		connected = true
+		ppChecker.reset().start()
 		console.clear()
 		await login()
 		mainMenu()
@@ -89,23 +92,37 @@ export function createWebsocket(addr: string) {
 }
 
 export const login = async () => {
-	Dialoguer.tty
-		.text('Welcome To ').link(Dialoguer.colors.brightBlue('DenoUno'), 'https://www.baidu.com')
-		.cursorNextLine.text(`please ensure your code page is 65001. use ${Dialoguer.colors.brightBlue('chcp')} to check it out.`)
-		.cursorNextLine(2)
+
+	Table.from([
+		[Cell.from(`Welcome To ${Dialoguer.ansi.link(Dialoguer.colors.brightBlue('DenoUno'), 'https://baidu.com')}`).colSpan(2)],
+		[`version`, ClientConf.version],
+	])
+		.border(true)
+		.render()
+	if (Deno.build.os === 'windows') {
+		Dialoguer.tty
+			.cursorNextLine(1)
+			.text(`(Windows Only)`)
+			.cursorNextLine
+			.text(`if u see garbled please restart after use ${Dialoguer.colors.brightBlue('chcp 65001')} to switch ur code page to 65001.`)
+			.cursorNextLine(2)
+	}
 	while (true) {
 		let ret
 		do {
 			ret = await Dialoguer.Input({ title: 'please input a nick' })
 			ret = ret.trim()
 		} while(!ret)
-		const resp = await ws.sendFuture(MyEvent.Login, { nick: ret })
-		console.log(resp.succ)
+		const resp = await ws.sendFuture(MyEvent.Login, { nick: ret, cv: ClientConf.cv })
 		if (resp.succ) {
 			playerUser.setName(ret)
 			break
 		} else {
-			console.log(`login fail, please try again!`)
+			console.log(`login fail, please try again later!`)
+			switch (resp.reason) {
+				case 'version': console.log(`reson: ur client's version is not consistent with the target server's version`); break;
+				case 'count_limit': console.log(`reson: the number of server's connections exceeds the maximum limit.`)
+			}
 		}
 	}
 }
@@ -170,18 +187,19 @@ export class ws {
 	}
 }
 
-// class ppChecker {
-// 	static _timeout = 10000
-// 	static _timeoutId = 0
-// 	static reset() {
-// 		clearTimeout(this._timeoutId)
-// 		return this
-// 	}
-// 	static start() {
-// 		// console.log('ping')
-// 		// _websocket.send('0')
-// 		// this._timeoutId = setTimeout(() => {
-// 		// 	_websocket?.close()
-// 		// }, this._timeout)
-// 	}
-// }
+class ppChecker {
+	static _timeout = 10000
+	static _timeoutId = 0
+	static _serverTimeoutId = 0
+	static reset() {
+		clearTimeout(this._timeoutId)
+		clearInterval(this._serverTimeoutId)
+		return this
+	}
+	static start() {
+		this._timeoutId = setTimeout(() => {
+			_websocket.send('0')
+			this._serverTimeoutId = setTimeout(() => _websocket.close(),)
+		}, this._timeout)
+	}
+}

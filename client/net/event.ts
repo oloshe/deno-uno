@@ -2,6 +2,7 @@ import { Card, CardColor, GameState, IRoomReq, IRoomRes, PlayerData, UserState }
 export enum MyEvent {
 	Login,
 	ChangeNick,
+	OnlineNum,
 	CreateRoom,
 	GetRoomList,
 	JoinRoom,
@@ -24,7 +25,8 @@ export enum MyEvent {
 // 事件参数定义
 interface EventDataDefine {
 	[MyEvent.Login]: {
-		nick: string
+		nick: string,
+		cv: string | number
 	}
 	[MyEvent.ChangeNick]: string
 	[MyEvent.CreateRoom]: IRoomReq,
@@ -49,7 +51,7 @@ interface EventDataDefine {
  * 字段不可与 [PushDataDefine] 重复，否则会有bug
  */
 export interface ResponseEventDataDefine {
-	[MyEvent.Login]: Result & { userId: string }
+	[MyEvent.Login]: Result & { userId: string, reason?: string }
 	[MyEvent.ChangeNick]: Result
 	[MyEvent.CreateRoom]: Result & { roomid: string }
 	[MyEvent.GetRoomList]: {
@@ -58,8 +60,8 @@ export interface ResponseEventDataDefine {
 		max: number
 	},
 	[MyEvent.JoinRoom]: ResultType<{
-		players: Record<string, PlayerData>
-		roomData: IRoomRes
+		players: Record<string, PlayerData | undefined> | undefined
+		roomData: IRoomRes | undefined
 	}>
 	[MyEvent.PlayCard]: {
 		succ: boolean
@@ -77,6 +79,7 @@ export interface PushDataDefine{
 	[MyEvent.ExitRoom]: {
 		sockid: string
 	}
+	[MyEvent.OnlineNum]: number
 	[MyEvent.PlayerJoinRoom]: {
 		playerData: PlayerData
 		roomData: Pick<IRoomRes, 'count'>
@@ -95,6 +98,7 @@ export interface PushDataDefine{
 		gameStatus: GameState
 		lastCard: Card | null
 		playersCardsNum: Record<string, number>
+		playerState: [string, UserState],
 		cards: Card[]
 		winner: string // id
 	}>

@@ -1,4 +1,4 @@
-import { Select, Input, /*Number, */ tty, colors, Table, ansi } from "../deps.ts"
+import { Select, Input, Cell, Confirm, tty, colors, Table, ansi } from "../deps.ts"
 // import { checkConnection, preventReconnect } from "./net/ws.ts";
 
 interface SelectItem {
@@ -17,24 +17,17 @@ interface InputOption {
 	title: string
 }
 
-// interface NumberOption {
-// 	title: string,
-// 	min?: number
-// 	max?: number
-// 	float?: boolean
-// 	round?: number
-// }
+interface ConfirmOption {
+	title: string
+}
 
 export class Dialoguer {
 	public static colors = colors
 	public static ansi = ansi
+	public static cell = Cell.from
 	public static selectDivider = Select.separator('----------')
 	public static async Select(option: SelectOption) {
-		const ret = await this.SelectAsync(option)
-		return ret
-	}
-	public static SelectAsync(option: SelectOption) {
-		return Select.prompt({
+		const ret = await Select.prompt({
 			message: option.title,
 			options: option.items,
 			listPointer: this.colors.blue(">"),
@@ -43,28 +36,22 @@ export class Dialoguer {
 				next: ['s', 'down'],
 			}
 		})
-	}
-	public static async Input(option: InputOption) {
-		const ret = await this.InputAsync(option)
 		return ret
 	}
-	public static InputAsync(option: InputOption) {
-		return Input.prompt({
+	public static async confirm(option: ConfirmOption) {
+		return await Confirm.prompt(option.title)
+	}
+	public static async Input(option: InputOption) {
+		const ret = await Input.prompt({
 			message: option.title
 		})
+		return ret
 	}
-	// public static async Number(option: NumberOption) {
-	// 	const ret = await Number.prompt({
-	// 		message: option.title,
-	// 		min: option.min,
-	// 		max: option.max,
-	// 		float: option.float,
-	// 		round: option.round,
-	// 	})
-	// 	return ret
-	// }
 	public static get Table() {
 		return new Table()
+	}
+	public static get TableFrom() {
+		return Table.from
 	}
 	public static tty = tty({
 		stdout: Deno.stdout,

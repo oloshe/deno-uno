@@ -31,7 +31,8 @@ export async function gamePage() {
 		}),
 		// 用户离开房间
 		ws.on(MyEvent.PlayerExitRoom, (data) => {
-			players[data.playerData._sockid].status = UserState.Leave;
+			const sid = data.playerData._sockid
+			players[sid] && (players[sid]!.status = UserState.Leave);
 			roomData.count = data.roomData.count
 			loop.update()
 		}),
@@ -44,7 +45,7 @@ export async function gamePage() {
 		ws.on(MyEvent.RoomUserState, (data) => {
 			const [id, state] = data;
 			if (loop.players[id]) {
-				loop.players[id].status = state
+				loop.players[id]!.status = state
 				loop.update()
 			}
 		}),
@@ -59,6 +60,7 @@ export async function gamePage() {
 				gameStatus,
 				lastCard,
 				playersCardsNum,
+				playerState,
 				winner,
 			} = data
 			clockwise !== void 0 && (loop.clockwise = clockwise)
@@ -71,6 +73,11 @@ export async function gamePage() {
 			playersCardsNum !== void 0 && Object.assign(loop.playersCardsNum, playersCardsNum)
 			lastCard !== void 0 && (loop.lastCard = lastCard ? CardFactory.concretization(lastCard) : lastCard)
 			cards !== void 0 && (loop.cards = cards.map(x => CardFactory.concretization(x)))
+			
+			if (playerState !== void 0) {
+				const [pid, state] = playerState
+				loop.players[pid] && (loop.players[pid]!.status = state)
+			}
 			loop.update()
 		})
 	]
@@ -94,7 +101,7 @@ const userStateMap: Record<UserState, string> = {
 
 class GameLoop {
 	roomData: IRoomRes;
-	players: Record<string, PlayerData>
+	players: Record<string, PlayerData | undefined>
 	// 我自己的卡
 	cards: Card[] = []
 	playersCardsNum: Record<string, number> = {}
@@ -105,17 +112,18 @@ class GameLoop {
 	gameState = GameState.Ready
 	currentColor: CardColor = CardColor.all
 	currentPlus = 0
-	turn = ''
+	turn = '' // id
+	turnName = 'other' // name
 	clockwise = true
 	myId: string = Cache.get(MyEvent.Login)!.userId
-	winner: string = ''
+	winner = ''
 
 	signal: Deferred<boolean>
 	_inputting = false
 
 	static red = Dialoguer.colors.red
 
-	constructor(roomData: IRoomRes, players: Record<string, PlayerData>) {
+	constructor(roomData: IRoomRes, players: Record<string, PlayerData | undefined>) {
 		this.roomData = roomData
 		this.players = players
 		this.signal = deferred()
@@ -140,9 +148,15 @@ class GameLoop {
 
 	async renderGameEnd() {
 		console.clear()
-		console.log('Game Over')
-		console.log(`The winner is ${this.players[this.winner]?.nick}`);
-		console.log('press any key to continue');
+		this._renderGamingPlayer();
+		if (this.winner === this.myId) {
+			console.log('You Win!');
+			console.log('press any key to continue');
+		} else {
+			console.log('Game Over')
+			console.log(`The winner is ${this.players[this.winner]?.nick}`);
+			console.log('press any key to continue');
+		}
 		await new Keypress()
 		this.resetData()
 		this.update()
@@ -152,14 +166,41 @@ class GameLoop {
 		// 重制游戏状态
 		this.gameState = GameState.Ready
 		// 删除离开的玩家
-		for (let id in this.players) {
-			const status = this.players[id].status
+		for (const id in this.players) {
+			const status = this.players[id]!.status
 			if (status === UserState.Leave || status === UserState.Offline) {
 				delete this.players[id]
 			} else {
-				this.players[id].status = UserState.Online
+				this.players[id]!.status = UserState.Online
 			}
 		}
+	}
+
+	_renderGamingPlayer() {
+		this.turnName = 'other'
+		Dialoguer.Table
+			.header(['nick', 'turn', 'cardNum', 'uno', 'status'])
+			.body(Object.keys(this.players).map(key => {
+				const p = this.players[key]
+				const nick = p?.nick || ''
+				const turn = this.turn === key ? 'yes' : ''
+				if (turn) {
+					this.turnName = nick
+				}
+				const num = this.playersCardsNum[key]
+				return [
+					nick,
+					turn,
+					num || '0',
+					num <= 1 ? 'UNO!' : '',
+					p?.status !== void 0 ? userStateMap[p!.status] : '',
+				]
+			}))
+			.padding(2)
+			.border(true)
+			.render()
+		
+		Dialoguer.tty.cursorNextLine(1);
 	}
 
 	async renderGame() {
@@ -179,33 +220,11 @@ class GameLoop {
 		
 		Dialoguer.tty.cursorNextLine(1);
 		
-		let turnPeople = 'another'
-		Dialoguer.Table
-			.header(['nick', 'turn', 'cardNum', 'uno', 'status'])
-			.body(Object.keys(this.players).map(key => {
-				const p = this.players[key]
-				const turn = this.turn === key ? 'yes' : ''
-				if (turn) {
-					turnPeople = p.nick
-				}
-				const num = this.playersCardsNum[key]
-				return [
-					p.nick,
-					turn,
-					num || '0',
-					num <= 1 ? 'UNO!' : '',
-					userStateMap[p.status] || '',
-				]
-			}))
-			.padding(2)
-			.border(true)
-			.render()
-		
-		Dialoguer.tty.cursorNextLine(1);
+		this._renderGamingPlayer()
 		
 		if (this.turn !== this.myId) {
 			this.exploreMyCard()
-			Dialoguer.tty.cursorNextLine(1).text(`wait for ${Dialoguer.colors.blue.underline(turnPeople)} to play card`).cursorNextLine(1);
+			Dialoguer.tty.cursorNextLine(1).text(`wait for ${Dialoguer.colors.blue.underline(this.turnName)} to play card`).cursorNextLine(1);
 		} else {
 			const drawStr = 'draw a card'
 			const cardArr = this.cards.map((card, index) => {
@@ -250,15 +269,6 @@ class GameLoop {
 		if (this._inputting) return
 		console.clear()
 		Dialoguer.tty.clearTerminal.text(`[${this.roomData.count}/${this.roomData.max}]`).cursorNextLine(2);
-		// new Array(this.roomData.max).fill(0).forEach((_, index) => {
-		// 	const p = this.players[Object.keys(this.players)[index]]
-		// 	if (!p) {
-		// 		Dialoguer.tty.text(Dialoguer.colors.gray('empty'))
-		// 	} else {
-		// 		const fn = p.status === UserState.Ready ? Dialoguer.colors.bgBrightBlue.white.underline : Dialoguer.colors.white
-		// 		Dialoguer.tty.text(fn(p.nick || ''))
-		// 	}
-		// })
 
 		Dialoguer.Table
 			.header(['player', 'ready'])
@@ -277,7 +287,7 @@ class GameLoop {
 			.cursorNextLine();
 
 		// 未准备
-		if (this.players[this.myId].status !== UserState.Ready) {
+		if (this.players[this.myId] && this.players[this.myId]!.status !== UserState.Ready) {
 			this._inputting = true
 			const ret = await Dialoguer.Select({
 				title: 'please select',
