@@ -1,18 +1,20 @@
-import { EventData, GameState, MyEvent, ReqData, ResponseData, ResponseEventDataDefine, UserState, v4, WebSocket } from "../deps.ts";
+import { v4, WebSocket } from "../deps.ts";
 import { Connection, PlayerCollection, Rooms } from "./cache.ts";
 import { Logger } from "./logger.ts";
 import { ServerConf } from "./server.config.ts";
+import { ReqData, GameState, UserState, EventData, MyEvent, ResponseData, ResponseEventDataDefine } from "../common/mod.ts";
+import { PM } from "./processMgr.ts";
 
+const map: Record<string, (data: unknown) => void> = {};
 
 function Event(event: MyEvent): MethodDecorator {
 	return (target, propertyKey) => {
 		const func = Reflect.get(target, propertyKey)
-		EventRouter.map[event] = func
+		map[event] = func
 	}
 }
 
 export class EventRouter {
-	static map: Record<string, (data: unknown) => void> = {};
 	/** sockid  */
 	sid: string
 	sock: WebSocket
@@ -25,7 +27,7 @@ export class EventRouter {
 	}
 	handle(req: ReqData<never>) {
 		const { func, data } = req
-		const executor = EventRouter.map[func];
+		const executor = map[func];
 		executor.call(this, data)
 	}
 
@@ -76,6 +78,7 @@ export class EventRouter {
 				count: 0,
 				ownerId: this.sid,
 				status: GameState.Ready,
+				pwd: !!data._pwd,
 			});
 		}
 		// 加入房间
@@ -84,14 +87,16 @@ export class EventRouter {
 
 	@Event(MyEvent.JoinRoom)
 	joinRoom(data: EventData<MyEvent.JoinRoom>) {
-		const succ = PlayerCollection.joinRoom(this.sid, data.id)
-		const players = Rooms.getRoomPlayers(data.id)
-		const roomData = Rooms.getRoom(data.id)
-		this.response(MyEvent.JoinRoom, {
-			succ,
-			players,
-			roomData,
-		})
+		const succ = PlayerCollection.joinRoom(this.sid, data.id, data.pwd)
+		if (!succ) {
+			this.response(MyEvent.JoinRoom, { succ })
+		} else {
+			this.response(MyEvent.JoinRoom, {
+				succ,
+				players: Rooms.getRoomPlayers(data.id),
+				roomData: Rooms.getRoom(data.id),
+			})
+		}
 	}
 
 	@Event(MyEvent.ExitRoom)
@@ -135,34 +140,52 @@ export class EventRouter {
 		const roomid = PlayerCollection.get(this.sid, 'roomid')
 		if (!roomid) { return }
 		const pm = Rooms.getGameProcess(roomid)
+		if (index === -1) {
+			// skip
+			pm?.nextTurn()
+			const succ = !!pm
+			this.response(MyEvent.PlayCard, { succ })
+			Rooms.roomBroadcast(roomid, {
+				callback(sid) {
+					Connection.sendTo(MyEvent.GameMeta, sid, { turn: pm?.turnPlayerId });
+				}
+			})
+			return
+		}
 		const succ = pm?.playCard(this.sid, index, color) ?? false
-		console.log('[play]', succ)
 		this.response(MyEvent.PlayCard, { succ })
 		if (succ && pm) {
-			const cardNum = pm.players[this.sid].length
-			const winner = cardNum === 0 ? this.sid : void 0
-			Rooms.roomBroadcast(roomid, {
-				callback: (sid) => {
-					Connection.sendTo(MyEvent.GameMeta, sid, {
-						turn: pm.turnPlayerId,
-						clockwise: pm.clockwise,
-						color: pm.currentColor,
-						plus: pm.currentPlus,
-						cardNum: pm.cardNum,
-						lastCard: pm.lastCard!,
-						cards: sid === this.sid ? pm.players[this.sid] : void 0,
-						playersCardsNum: {
-							[this.sid]: cardNum
-						},
-						gameStatus: winner ? GameState.End : void 0,
-						winner,
-					})
-					winner
-						&& PlayerCollection.set(sid, { status: UserState.Online })
-						&& Connection.sendTo(MyEvent.RoomUserState, sid, [sid, UserState.Online])
-				},
-			})
+			this._afterPlaySucc(roomid, pm)
 		}
+	}
+
+	_afterPlaySucc(roomid: string, pm: PM) {
+		const cardNum = pm.players[this.sid].length
+		const winner = cardNum === 0 ? this.sid : void 0
+		Rooms.roomBroadcast(roomid, {
+			before: () => {
+				winner && pm.onGameOver(winner)
+			},
+			callback: (sid) => {
+				Connection.sendTo(MyEvent.GameMeta, sid, {
+					turn: pm.turnPlayerId,
+					clockwise: pm.clockwise,
+					color: pm.currentColor,
+					plus: pm.currentPlus,
+					cardNum: pm.cardNum,
+					lastCard: pm.lastCard!,
+					cards: sid === this.sid ? pm.players[this.sid] : void 0,
+					playersCardsNum: {
+						[this.sid]: cardNum
+					},
+					gameStatus: winner ? GameState.End : void 0,
+					winner,
+				})
+				winner
+					&& PlayerCollection.set(sid, { status: UserState.Online })
+					&& Connection.sendTo(MyEvent.RoomUserState, sid, [sid, UserState.Online])
+			},
+		})
 	}
 
 	@Event(MyEvent.DrawCard)
@@ -170,8 +193,8 @@ export class EventRouter {
 		const roomid = PlayerCollection.get(this.sid, 'roomid')
 		if (!roomid) return
 		const pm = Rooms.getGameProcess(roomid)
-		const succ = pm?.drawCard(this.sid) ?? false
-		this.response(MyEvent.DrawCard, { succ })
+		const [succ, drawedIndex] = pm?.drawCard(this.sid) ?? [false]
+		this.response(MyEvent.DrawCard, { succ, drawedIndex })
 		console.log('[draw]', succ)
 		if (succ && pm) {
 			Rooms.roomBroadcast(roomid, {
@@ -184,7 +207,7 @@ export class EventRouter {
 						color: pm.currentColor,
 						playersCardsNum: {
 							[this.sid]: pm.players[this.sid].length
-						}
+						},
 					})
 				}
 			})

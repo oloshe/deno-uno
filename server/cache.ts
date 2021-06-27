@@ -1,8 +1,8 @@
-import { IRoomRes, PlayerData, MyEvent, PushData, GameState } from "../deps.ts"
+import { GameState, IRoomRes, PlayerData } from "../common/mod.ts"
+import { MyEvent, PushData } from "../common/event.ts";
 import { WebSocket } from "../deps.ts"
 import { Logger } from "./logger.ts";
 import { PM } from "./processMgr.ts";
-import { ServerConf } from "./server.config.ts";
 
 type sockid = string
 type roomid = string
@@ -66,15 +66,20 @@ export class PlayerCollection {
 	static del(id: sockid) {
 		delete this._data[id]
 	}
-	static joinRoom(sockid: sockid, roomid: roomid) {
+	static joinRoom(sockid: sockid, roomid: roomid, pwd?: string) {
 		const oldRoomid = PlayerCollection.get(sockid, 'roomid')
 		// 已经在房间内 && 房间内实际数据存在
 		if (oldRoomid && oldRoomid != roomid && Rooms.playerInThisRoom(oldRoomid, sockid)) {
 			return false
 		}
 		const room = Rooms.getRoom(roomid)
+		// 房间不存在
 		if (!room) { return false }
-
+		// 游戏已经开始
+		if (room.status === GameState.Start) { return false }
+		// 密码不正确
+		if (room.pwd && room._pwd !== pwd) { return false }
+		// 超过人数范围
 		if (room.count >= room.max) { return false }
 		// 设置用户房间
 		PlayerCollection.set(sockid, { roomid: room.id })
@@ -85,13 +90,14 @@ export class PlayerCollection {
 		const roomid = PlayerCollection.get(sockid, 'roomid')
 		if (!roomid) { return }
 		PlayerCollection.set(sockid, { roomid: null });
-		// 移除玩家
+		// 广播房间内 移除玩家
 		Rooms.broadcastExit(roomid, sockid)
 		const room = Rooms.getRoom(roomid), players = Rooms.getRoomPlayers(roomid);
 		if (room && players) {
 			const len = Object.keys(players).length
 			room.count = len
 			if (len === 0) {
+				// 全部玩家都走完，删除房间
 				Rooms.del(roomid)
 			}
 		}
@@ -116,7 +122,10 @@ export class Rooms {
 	static getList(no: number, num: number) {
 		const start = (no - 1) * num
 		return {
-			list: this._roomList.slice(start, start + num),
+			list: this._roomList.slice(start, start + num).map(itm => ({
+				...itm,
+				_pwd: void 0,
+			})),
 			no, max: Math.ceil(this._roomList.length / no)
 		}
 	}
@@ -208,17 +217,28 @@ export class Rooms {
 					roomData: { count: len }
 				})
 			},
-			after: () => {
-				this.getGameProcess(roomid)?.onUserLeave(sockid)
+			after: (datas) => {
+				const pm = this.getGameProcess(roomid), keys = Object.keys(datas)
+				// 剩下1个人就游戏结束
+				if (keys.length === 1 && pm?.life) {
+					const winner = keys[0]
+					pm.onGameOver(winner)
+					Connection.sendTo(MyEvent.GameMeta, winner, {
+						winner,
+						gameStatus: GameState.End,
+					})
+				}
+				pm?.onUserLeave(sockid)
 			}
 		})
 	}
 	static roomStart(roomid: roomid, players: Record<string, unknown>) {
-		const pm = new PM(players)
+		Rooms.setRoom(roomid, { status: GameState.Start })
+		const pm = new PM(roomid, players)
 		this._gameProcess[roomid] = pm
 		this.roomBroadcast(roomid, {
 			callback: (sid) => {
-				Connection.sendTo(MyEvent.GameMeta, sid, {
+				const data = {
 					cards: pm.players[sid],
 					color: pm.currentColor,
 					turn: Object.keys(pm.players)[pm.turn],
@@ -229,7 +249,9 @@ export class Rooms {
 						p[cur] = pm.players[cur].length
 						return p
 					}, {})
-				})
+				}
+				console.log(data)
+				Connection.sendTo(MyEvent.GameMeta, sid, data)
 			}
 		})
 	}

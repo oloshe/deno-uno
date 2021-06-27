@@ -4,11 +4,10 @@ import {
 	acceptWebSocket,
 	isWebSocketCloseEvent,
 	WebSocket,
-	ReqData,
 	v4,
-	Constant
 } from "../deps.ts";
-import { Connection } from "./cache.ts"
+import { ReqData, Constant } from "../common/mod.ts";
+import { Connection, PlayerCollection } from "./cache.ts"
 import { Logger } from "./logger.ts"
 import { EventRouter } from "./eventRouter.ts";
 
@@ -23,16 +22,20 @@ export async function handleWs(sock: WebSocket) {
 			if (isWebSocketCloseEvent(ev)) {
 				const { code, reason } = ev;
 				Logger.log("[ws::close]", code, reason);
+				break;
 			}
 			if (typeof ev === "string") {
-				if (ev === '0') {
-					sock.send('1');
+				if (ev[0] === '0') {
+					const sendTime = parseInt(ev.slice(2))
+					const ping = Date.now() - (isNaN(sendTime) ? 0 : sendTime)
+					PlayerCollection.set(sockid, { ping: ping })
+					sock.send(`1`);
 				} else {
 					const req: ReqData<never> = JSON.parse(ev)
 					try {
 						router.handle(req)
 					} catch (e) {
-						console.log(e)
+						console.error(e)
 					}
 				}
 			}
@@ -65,5 +68,5 @@ export async function runServer(port = Constant.serverPort) {
 	}
 }
 if (import.meta.main) {
-	runServer()
+	runServer(Deno.args[0])
 }

@@ -1,8 +1,12 @@
-
-
-import { MyEvent, EventData, ResponseData, ReqData, ResponseEventDataDefine, PushData, Dialoguer, playerUser, Cache, deferred, Table, Cell } from "../../deps.ts"
+import { MyEvent, EventData, ResponseData, ResponseEventDataDefine, PushData } from "../../common/event.ts"
+import { ReqData } from "../../common/ws.dto.ts"
+import { Dialoguer } from "../dialoguer.ts"
+import { playerUser } from "../../common/user.ts"
+import { Cache } from "../cache.ts"
+import { deferred, Table, Cell } from "../../deps.ts"
 import { ClientConf } from "../client.config.ts";
 import { mainMenu } from "../menu.ts";
+import { Constant } from "../../common/constant.ts";
 
 let _websocket: WebSocket
 let lastestAddr = ''
@@ -49,11 +53,11 @@ export function createWebsocket(addr: string) {
 	console.clear()
 	console.log('connecting server...')
 	_websocket.onmessage = function (ev: MessageEvent) {
-		const _rawdata = JSON.parse(ev.data)
-		if (_rawdata == 1) {
+		if (ev.data[0] == '1') {
 			ppChecker.reset().start()
 			return
 		}
+		const _rawdata = JSON.parse(ev.data)
 		// console.log('[ws.onmessage]', _rawdata)
 		const { func, data } = _rawdata;
 		Cache.set(func, data)
@@ -94,7 +98,7 @@ export function createWebsocket(addr: string) {
 export const login = async () => {
 
 	Table.from([
-		[Cell.from(`Welcome To ${Dialoguer.ansi.link(Dialoguer.colors.brightBlue('DenoUno'), 'https://baidu.com')}`).colSpan(2)],
+		[Cell.from(`Welcome To ${Dialoguer.ansi.link(Dialoguer.colors.brightBlue('DenoUno'), 'https://baidu.com')}${Constant.isDev?'[dev]':''}`).colSpan(2)],
 		[`version`, ClientConf.version],
 	])
 		.border(true)
@@ -107,11 +111,13 @@ export const login = async () => {
 			.text(`if u see garbled please restart after use ${Dialoguer.colors.brightBlue('chcp 65001')} to switch ur code page to 65001.`)
 			.cursorNextLine(2)
 	}
+	let tip = 'your nick'
 	while (true) {
 		let ret
 		do {
-			ret = await Dialoguer.Input({ title: 'please input a nick' })
+			ret = await Dialoguer.Input({ title: tip })
 			ret = ret.trim()
+			tip = 'please input your nick'
 		} while(!ret)
 		const resp = await ws.sendFuture(MyEvent.Login, { nick: ret, cv: ClientConf.cv })
 		if (resp.succ) {
@@ -188,7 +194,7 @@ export class ws {
 }
 
 class ppChecker {
-	static _timeout = 10000
+	static _timeout = 3000
 	static _timeoutId = 0
 	static _serverTimeoutId = 0
 	static reset() {
@@ -198,8 +204,8 @@ class ppChecker {
 	}
 	static start() {
 		this._timeoutId = setTimeout(() => {
-			_websocket.send('0')
-			this._serverTimeoutId = setTimeout(() => _websocket.close(),)
+			_websocket.send(`0.${Date.now()}`)
+			this._serverTimeoutId = setTimeout(() => _websocket.close(), this._timeout)
 		}, this._timeout)
 	}
 }

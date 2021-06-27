@@ -1,4 +1,4 @@
-import { Constant } from "../deps.ts";
+import { Constant } from "../common/constant.ts";
 import { createWebsocket } from "./net/ws.ts"
 
 export async function runClient(addr = Constant.addr) {

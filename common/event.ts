@@ -1,4 +1,7 @@
-import { Card, CardColor, GameState, IRoomReq, IRoomRes, PlayerData, UserState } from "../../deps.ts"
+import { Card, CardColor } from "./card.ts";
+import { GameState, UserState } from "./state.ts"
+import { PlayerData } from "./user.ts";
+import { IRoomRes, IRoomReq } from "./room.ts"
 export enum MyEvent {
 	Login,
 	ChangeNick,
@@ -12,6 +15,7 @@ export enum MyEvent {
 	PlayCard,
 	/** 抽牌 */
 	DrawCard,
+	/** 跳过 */
 	// PUSH
 	PlayerJoinRoom,
 	PlayerExitRoom,
@@ -38,6 +42,7 @@ interface EventDataDefine {
 	}
 	[MyEvent.JoinRoom]: {
 		id: string
+		pwd?: string
 	}
 	[MyEvent.PlayCard]: {
 		index: number,
@@ -68,6 +73,7 @@ export interface ResponseEventDataDefine {
 	}
 	[MyEvent.DrawCard]: {
 		succ: boolean
+		drawedIndex?: number
 	}
 	[MyEvent.Ready]: Result
 }
@@ -97,8 +103,10 @@ export interface PushDataDefine{
 		cardNum: number
 		gameStatus: GameState
 		lastCard: Card | null
+		drawedIndex: number
 		playersCardsNum: Record<string, number>
-		playerState: [string, UserState],
+		playerState: [string, UserState]
+		playerPoint: Record<string, number>
 		cards: Card[]
 		winner: string // id
 	}>

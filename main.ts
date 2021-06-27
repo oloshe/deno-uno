@@ -1,7 +1,8 @@
 import { parseFlags } from "https://deno.land/x/cliffy@v0.19.2/flags/mod.ts";
 import { ClientConf } from "./client/client.config.ts";
 import { runClient } from "./client/client.ts";
-import { Command, Constant } from "./deps.ts";
+import { Command } from "./deps.ts";
+import { Constant } from "./common/constant.ts"
 import { runServer } from "./server/server.ts";
 
 if (import.meta.main) {

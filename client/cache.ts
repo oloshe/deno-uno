@@ -1,5 +1,4 @@
-import { MyEvent, PushData, PushDataDefine, ResponseData, ResponseEventDataDefine } from "../deps.ts";
-
+import { MyEvent, PushData, PushDataDefine, ResponseEventDataDefine, ResponseData } from "../common/event.ts"
 export class Cache {
 	private static _innerCache: Record<string, unknown> = {}
 	static get<T extends keyof ResponseEventDataDefine | keyof PushDataDefine>(event: T):

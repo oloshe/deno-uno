@@ -1,4 +1,4 @@
-import { Dialoguer } from "../deps.ts";
+import { colors } from "../deps.ts";
 
 /**
  * 牌颜色
@@ -33,11 +33,11 @@ export enum CardType {
 export const colorFn = (color: CardColor, str: string) => {
   if (str === '') str = ' '
 	switch(color){
-		case CardColor.yellow: return Dialoguer.colors.bgWhite.yellow.underline(str)
-		case CardColor.red: return Dialoguer.colors.bgWhite.red.underline(str)
-		case CardColor.blue: return Dialoguer.colors.bgWhite.blue.underline(str)
-		case CardColor.green: return Dialoguer.colors.bgWhite.green.underline(str)
-		case CardColor.all: return Dialoguer.colors.bgBlack.white.underline(str)
+		case CardColor.yellow: return colors.bgWhite.yellow.underline(str)
+		case CardColor.red: return colors.bgWhite.red.underline(str)
+		case CardColor.blue: return colors.bgWhite.blue.underline(str)
+		case CardColor.green: return colors.bgWhite.green.underline(str)
+		case CardColor.all: return colors.bgBlack.white.underline(str)
 		default: return '';
 	}
 }

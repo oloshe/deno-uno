@@ -1,12 +1,13 @@
-
-import { CardType, Card, CardColor, SkipCard, Plus2Card, Plus4Card, NumberCard, ReverseCard, ColorSwitchCard, MyEvent, UserState, GameState } from "../deps.ts";
-import { Connection } from "./cache.ts";
+import { Card, CardType, CardColor, SkipCard, Plus2Card, Plus4Card, NumberCard, ReverseCard, ColorSwitchCard } from "../common/card.ts"
+import { GameState, UserState } from "../common/state.ts";
+import { Connection, Rooms } from "./cache.ts";
+import { MyEvent } from "../common/event.ts";
 
 export class PM {
-	static TOTAL_CARD_NUM = 107
+	// static TOTAL_CARD_NUM = 107
 
 	/** 每个牌的分值（数字牌需要特殊处理） */
-	cardRecord: Record<CardType, number> = {
+	private cardRecord: Record<CardType, number> = {
 		[CardType.number]: 0,
 		[CardType.plus2]: 20,
 		[CardType.reverse]: 20,
@@ -39,6 +40,8 @@ export class PM {
 		return this.cards.length
 	}
 
+	roomid: string
+
 	/** 轮到谁的回合 */
 	turn: number
 	turnPlayerId: string
@@ -53,23 +56,26 @@ export class PM {
 	currentPlus = 0
 	/** 当前牌的类型 */
 	lastCard: Card | null = null
+	life: boolean
 
 	/** 人数 */
 	private get playerCount() {
 		return Object.keys(this.players).length
 	}
 
-	constructor(player: Record<string, unknown>) {
+	constructor(roomid: string, player: Record<string, unknown>) {
+		this.roomid = roomid
 		this.players = {}
 		const playerKeys = Object.keys(player)
 		playerKeys.forEach(key => this.players[key] = [])
 		this.cards = this.getInitialCard()
-		this.shuffle()
+		this.cards = this.shuffle()
 		this.dealCards()
 		this.turn = 0
 		this.turnPlayerId = playerKeys[0]
 		this.clockwise = true
 		this.currentColor = CardColor.all
+		this.life = true
 	}
 
 	calCardScore(cards: Array<Card>): number {
@@ -143,11 +149,6 @@ export class PM {
 			return arr;
 		})();
 
-		// console.log('cardNum0: ', cardNum0.length)
-		// console.log('cardNum1to9: ', cardNum1to9.length)
-		// console.log('cardFn: ', cardFn.length)
-		// console.log('cardHigh: ', cardHigh.length)
-
 		cards.push(
 			...cardNum0,
 			...cardNum1to9,
@@ -169,7 +170,7 @@ export class PM {
 			const j = Math.floor(Math.random() * i--);
 			[arr[j], arr[i]] = [arr[i], arr[j]];
 		}
-		return arr;
+		return arr.slice(0, 16);
 	}
 
 	/**
@@ -177,9 +178,11 @@ export class PM {
 	 */
 	dealCards(): void {
 		const playersCardsList = Object.keys(this.players).map(k => this.players[k]);
-		const len = playersCardsList.length, maxCount = this.DEAL_COUNT * len;
+		const len = playersCardsList.length,
+			maxCountPer = this.DEAL_COUNT * len,
+			cardNum = this.cardNum;
 		let currIdx = 0;
-		for (let i = 0; i < maxCount; i++) {
+		for (let i = 0; i < maxCountPer && i < cardNum; i++) {
 			const card = this.cards.pop()!
 			playersCardsList[currIdx++].push(card);
 			if (currIdx >= len) { currIdx = 0 }
@@ -196,23 +199,8 @@ export class PM {
 
 	onUserLeave(sockid: string) {
 		this.leavePlayers[sockid] = true
-		// 全部人都走只剩下 不用到下一轮了
-		if (this.playerCount === this.leavePlayerCount + 1) {
-			let winner: string | undefined
-			for (const id in this.players) {
-				if (!this.leavePlayers[id]) {
-					winner = id
-					break
-				}
-			}
-			winner && Connection.sendTo(MyEvent.GameMeta, winner, {
-				winner,
-				gameStatus: GameState.End,
-			})
-			return false
-		}
 		// 当前玩家出牌已经溜了， 所以轮到下一家出牌
-		if (this.turnPlayerId === sockid) {
+		if (this.turnPlayerId === sockid && this.life) {
 			this.nextTurn()
 			Object.keys(this.players).forEach(id => {
 				if (!this.leavePlayers[id]) {
@@ -223,6 +211,26 @@ export class PM {
 			})
 		}
 		return true
+	}
+
+	onGameOver(winner: string) {
+		this.life = false
+		const scoreMap: Record<string, number> = {}
+		Object.keys(this.players).forEach(key => {
+			const cards = this.players[key]
+			const score = this.calCardScore(cards)
+			scoreMap[key] = score
+		})
+		Object.keys(this.players).forEach(id => {
+			if (!this.leavePlayers[id]) {
+				Connection.sendTo(MyEvent.GameMeta, id, {
+					playerPoint: scoreMap,
+					// prevent state unfresh
+					turn: '',
+				})
+			}
+		})
+		Rooms.setRoom(this.roomid, { status: GameState.Ready })
 	}
 
 	playCard(uid: string, index: number, color?: CardColor) {
@@ -275,19 +283,27 @@ export class PM {
 		const turnId = this.getTurnPlayerId()
 		this.turnPlayerId = turnId
 		// this user is leave, so it's not his turn
-		this.leavePlayers[turnId] && this.nextTurn(step)
+		this.leavePlayers[turnId] && this.nextTurn(1)
 	}
 
-	drawCard(sid: string) {
-		const player = this.players[sid]
-		if (!player) return false
-		const num = this.currentPlus === 0 ? 1 : this.currentPlus
+	drawCard(sid: string): [boolean, number?] {
+		const cards = this.players[sid]
+		if (!cards) return [false]
+		if (this.cardNum <= 0) return [false]
+		let num = 1, skip = false
+		if (this.currentPlus !== 0) {
+			num = this.currentPlus
+			skip = true
+		}
 		const newCards = this.cards.splice(this.cards.length - 1 - num, num);
-		player.push(...newCards)
-		this.currentPlus = 0
-		this.lastCard = null
-		this.currentValue = -1
-		this.currentColor = CardColor.all
-		return true
+		cards.push(...newCards)
+		if (num === 1) {
+			// index for play again
+			return [true, cards.length - 1]
+		} else {
+			this.currentPlus = 0
+			// return true for skip
+			return [true]
+		}
 	}
 }

@@ -20,4 +20,5 @@ export interface PlayerData {
 	status: UserState,
 	nick: string
 	roomid?: string | null
+	ping?: number
 }

@@ -1,9 +1,10 @@
-import { GameState } from "../deps.ts";
+import { GameState } from "./state.ts";
 
 export interface IRoomReq {
 	name: string
 	max: number
 	owner: string
+	_pwd?: string
 }
 
 export interface IRoomRes extends IRoomReq {
@@ -12,4 +13,5 @@ export interface IRoomRes extends IRoomReq {
 	createTime: number
 	ownerId: string
 	status: GameState,
+	pwd: boolean
 }
