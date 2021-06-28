@@ -7983,7 +7983,7 @@ class PM {
                 arr[j]
             ];
         }
-        return arr.slice(0, 16);
+        return arr;
     }
     dealCards() {
         const playersCardsList = Object.keys(this.players).map((k)=>this.players[k]
@@ -8088,6 +8088,7 @@ class PM {
         if (this.currentPlus !== 0) {
             num = this.currentPlus;
             this.currentPlus = 0;
+            this.lastCard = null;
         }
         const newCards = this.cards.splice(this.cards.length - 1 - num, num);
         cards.push(...newCards);

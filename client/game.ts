@@ -88,7 +88,6 @@ export async function gamePage() {
 			cardNum !== void 0 && (loop.cardNum = cardNum)
 			gameStatus !== void 0 && (loop.gameState = gameStatus)
 			winner !== void 0 && (loop.winner = winner)
-			drawedIndex !== void 0 && (loop.drawedIndex = drawedIndex)
 			playerPoint !== void 0 && Object.assign(loop.playerPoint, playerPoint)
 			playersCardsNum !== void 0 && Object.assign(loop.playersCardsNum, playersCardsNum)
 			lastCard !== void 0 && (loop.lastCard = lastCard ? CardFactory.concretization(lastCard) : lastCard)
@@ -128,7 +127,6 @@ class GameLoop {
 	// 卡牌堆里面的卡牌数量
 	cardNum = 0
 	lastCard: Card | null = null
-	drawedIndex = -1
 
 	gameState = GameState.Ready
 	currentColor: CardColor = CardColor.all
@@ -142,8 +140,6 @@ class GameLoop {
 
 	signal: Deferred<boolean>
 	_inputting = false
-
-	static red = Dialoguer.colors.red
 
 	constructor(roomData: IRoomRes, players: Record<string, PlayerData | undefined>) {
 		this.roomData = roomData
@@ -192,6 +188,12 @@ class GameLoop {
 		// 重制游戏状态
 		this.gameState = GameState.Ready
 		this.playerPoint = {}
+		this.lastCard = null
+		this.currentPlus = 0
+		this.playersCardsNum = {}
+		this.playerPoint = {}
+		this.clockwise = true
+		this.turnName = 'other'
 		this.winner = ''
 		// 删除离开的玩家
 		for (const id in this.players) {

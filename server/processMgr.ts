@@ -170,7 +170,7 @@ export class PM {
 			const j = Math.floor(Math.random() * i--);
 			[arr[j], arr[i]] = [arr[i], arr[j]];
 		}
-		return arr.slice(0, 16);
+		return arr;
 	}
 
 	/**
@@ -300,6 +300,7 @@ export class PM {
 		if (this.currentPlus !== 0) {
 			num = this.currentPlus
 			this.currentPlus = 0
+			this.lastCard = null
 		}
 		const newCards = this.cards.splice(this.cards.length - 1 - num, num);
 		cards.push(...newCards)

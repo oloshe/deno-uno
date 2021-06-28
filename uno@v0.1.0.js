@@ -765,7 +765,7 @@ function black(str) {
         30
     ], 39));
 }
-function red1(str) {
+function red(str) {
     return run1(str, code1([
         31
     ], 39));
@@ -996,7 +996,7 @@ const mod = function() {
         hidden: hidden1,
         strikethrough: strikethrough,
         black: black,
-        red: red1,
+        red: red,
         green: green,
         yellow: yellow,
         blue: blue,
@@ -2614,7 +2614,7 @@ class HelpGenerator {
                         option9.flags.map((flag)=>blue(flag)
                         ).join(", "),
                         highlightArguments(option9.typeDefinition || "", this.options.types),
-                        red1(bold("-")) + " " + option9.description.split("\n").shift(),
+                        red(bold("-")) + " " + option9.description.split("\n").shift(),
                         this.generateHints(option9), 
                     ]
                 ), 
@@ -2633,7 +2633,7 @@ class HelpGenerator {
             ...options6.map((option9)=>[
                     option9.flags.map((flag)=>blue(flag)
                     ).join(", "),
-                    red1(bold("-")) + " " + option9.description.split("\n").shift(),
+                    red(bold("-")) + " " + option9.description.split("\n").shift(),
                     this.generateHints(option9), 
                 ]
             ), 
@@ -2662,7 +2662,7 @@ class HelpGenerator {
                         ].map((name18)=>blue(name18)
                         ).join(", "),
                         highlightArguments(command.getArgsDefinition() || "", this.options.types),
-                        red1(bold("-")) + " " + command.getDescription().split("\n").shift(), 
+                        red(bold("-")) + " " + command.getDescription().split("\n").shift(), 
                     ]
                 ), 
             ]).padding([
@@ -2678,7 +2678,7 @@ class HelpGenerator {
                         ...command.getAliases()
                     ].map((name18)=>blue(name18)
                     ).join(", "),
-                    red1(bold("-")) + " " + command.getDescription().split("\n").shift(), 
+                    red(bold("-")) + " " + command.getDescription().split("\n").shift(), 
                 ]
             ), 
         ]).padding([
@@ -2696,7 +2696,7 @@ class HelpGenerator {
                     envVar.names.map((name18)=>blue(name18)
                     ).join(", "),
                     highlightArgumentDetails(envVar.details, this.options.types),
-                    `${red1(bold("-"))} ${envVar.description}`, 
+                    `${red(bold("-"))} ${envVar.description}`, 
                 ]
             ), 
         ]).padding(2).indent(this.indent * 2).toString() + "\n";
@@ -2720,7 +2720,7 @@ class HelpGenerator {
         option.required && hints.push(yellow(`required`));
         typeof option.default !== "undefined" && hints.push(bold(`Default: `) + inspect(option.default, this.options.colors));
         option.depends?.length && hints.push(yellow(bold(`Depends: `)) + italic(option.depends.map(getFlag).join(", ")));
-        option.conflicts?.length && hints.push(red1(bold(`Conflicts: `)) + italic(option.conflicts.map(getFlag).join(", ")));
+        option.conflicts?.length && hints.push(red(bold(`Conflicts: `)) + italic(option.conflicts.map(getFlag).join(", ")));
         const type3 = this.cmd.getType(option.args[0]?.type)?.handler;
         if (type3 instanceof Type) {
             const possibleValues = type3.values?.(this.cmd, this.cmd.getParent());
@@ -2767,7 +2767,7 @@ function highlightArgumentDetails(arg3, types1 = true) {
     str += name18;
     if (types1) {
         str += yellow(":");
-        str += red1(arg3.type);
+        str += red(arg3.type);
     }
     if (arg3.list) {
         str += green("[]");
@@ -3404,7 +3404,7 @@ class Command {
             return error;
         }
         this.showHelp();
-        Deno.stderr.writeSync(new TextEncoder().encode(red1(`  ${bold("error")}: ${error.message}\n`) + "\n"));
+        Deno.stderr.writeSync(new TextEncoder().encode(red(`  ${bold("error")}: ${error.message}\n`) + "\n"));
         Deno.exit(error instanceof ValidationError1 ? error.exitCode : 1);
     }
     getName() {
@@ -4346,7 +4346,7 @@ class GenericPrompt {
         return this.error() ?? this.hint();
     }
     error() {
-        return this.#lastError ? this.settings.indent + red1(bold(`${Figures.CROSS} `) + this.#lastError) : undefined;
+        return this.#lastError ? this.settings.indent + red(bold(`${Figures.CROSS} `) + this.#lastError) : undefined;
     }
     hint() {
         return this.settings.hint ? this.settings.indent + italic(blue(dim(`${Figures.POINTER} `) + this.settings.hint)) : undefined;
@@ -4777,7 +4777,7 @@ class Checkbox extends GenericList {
             minOptions: 0,
             maxOptions: Infinity,
             check: green(Figures.TICK),
-            uncheck: red1(Figures.CROSS),
+            uncheck: red(Figures.CROSS),
             ...options,
             keys: {
                 check: [
@@ -7988,7 +7988,7 @@ class PM {
                 arr[j]
             ];
         }
-        return arr.slice(0, 16);
+        return arr;
     }
     dealCards() {
         const playersCardsList = Object.keys(this.players).map((k)=>this.players[k]
@@ -8093,6 +8093,7 @@ class PM {
         if (this.currentPlus !== 0) {
             num = this.currentPlus;
             this.currentPlus = 0;
+            this.lastCard = null;
         }
         const newCards = this.cards.splice(this.cards.length - 1 - num, num);
         cards.push(...newCards);
@@ -8531,7 +8532,6 @@ async function gamePage() {
             cardNum !== void 0 && (loop.cardNum = cardNum);
             gameStatus !== void 0 && (loop.gameState = gameStatus);
             winner !== void 0 && (loop.winner = winner);
-            drawedIndex !== void 0 && (loop.drawedIndex = drawedIndex);
             playerPoint !== void 0 && Object.assign(loop.playerPoint, playerPoint);
             playersCardsNum !== void 0 && Object.assign(loop.playersCardsNum, playersCardsNum);
             lastCard !== void 0 && (loop.lastCard = lastCard ? CardFactory.concretization(lastCard) : lastCard);
@@ -8566,7 +8566,6 @@ class GameLoop {
     };
     cardNum = 0;
     lastCard = null;
-    drawedIndex = -1;
     gameState = GameState.Ready;
     currentColor = CardColor.all;
     currentPlus = 0;
@@ -8579,7 +8578,6 @@ class GameLoop {
     };
     signal;
     _inputting = false;
-    static red = Dialoguer.colors.red;
     constructor(roomData1, players1){
         this.roomData = roomData1;
         this.players = players1;
@@ -8629,6 +8627,14 @@ class GameLoop {
         this.gameState = GameState.Ready;
         this.playerPoint = {
         };
+        this.lastCard = null;
+        this.currentPlus = 0;
+        this.playersCardsNum = {
+        };
+        this.playerPoint = {
+        };
+        this.clockwise = true;
+        this.turnName = 'other';
         this.winner = '';
         for(const id in this.players){
             const status = this.players[id].status;
