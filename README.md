@@ -11,7 +11,7 @@ Deno: [1.11.2](https://deno.land/#installation)
 ### play
 
 ```shell
-deno run --unstable --allow-net https://gitee.com/oloshe/deno-uno/attach_files/756244/download/uno@0.1.0.js
+deno run --unstable --allow-net https://github.com/oloshe/deno-uno/releases/download/v0.1.0/uno@0.1.0.js
 ```
 
 > For convenience, the following command replaces the URL address with `uno.js`
@@ -36,13 +36,13 @@ press **Enter** to confirm
 
 ## Screenshot
 
-![menu](https://gitee.com/oloshe/deno-uno/raw/master/pics/WX20210628-211439.png)
+![menu](https://raw.githubusercontent.com/oloshe/deno-uno/master/pics/WX20210628-211439.png)
 
-![room](https://gitee.com/oloshe/deno-uno/raw/master/pics/WX20210628-211604.png)
+![room](https://raw.githubusercontent.com/oloshe/deno-uno/master/pics/WX20210628-211604.png)
 
-![game](https://gitee.com/oloshe/deno-uno/raw/master/pics/WX20210628-211656.png)
+![game](https://raw.githubusercontent.com/oloshe/deno-uno/master/pics/WX20210628-211656.png)
 
-![win](https://gitee.com/oloshe/deno-uno/raw/master/pics/WX20210628-211812.png)
+![win](https://raw.githubusercontent.com/oloshe/deno-uno/master/pics/WX20210628-211812.png)
 
 ## Have Fun
 
