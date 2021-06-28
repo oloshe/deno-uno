@@ -3,7 +3,7 @@ const devConf = {
 }
 
 const prodConf = {
-	addr: '101.34.48.12:20210',
+	addr: 'localhost:20210',
 }
 
 const defaultConf = {
