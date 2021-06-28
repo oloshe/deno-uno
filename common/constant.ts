@@ -7,7 +7,7 @@ const prodConf = {
 }
 
 const defaultConf = {
-	isDev: true,
+	isDev: false,
 	serverPort: '20210',
 }
 

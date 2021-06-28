@@ -10,6 +10,8 @@ import { PlayerData } from "../common/user.ts"
 import { GameState, UserState } from "../common/state.ts"
 import { CardColor, CardFactory, visualColor, Card } from "../common/card.ts"
 
+type SelectParam = Parameters<typeof Dialoguer.Select>[0];
+
 export async function joinRoom(id: string, pwd?: string) {
 	const ret = await ws.sendFuture(MyEvent.JoinRoom, { id, pwd })
 	if (ret.succ) {
@@ -157,7 +159,7 @@ class GameLoop {
 				case GameState.End: await this.renderGameEnd(); break;
 			}
 		} catch (e) {
-			if (e === 'skip') return
+			if (e.message === 'skip') return
 			console.error(e)
 		}
 	}
@@ -246,6 +248,10 @@ class GameLoop {
 		Dialoguer.tty.cursorNextLine(1);
 	}
 
+	renderCard(card: Card) {
+		return card.toColorString() + ' ' + visualColor(card.color)
+	}
+
 	async renderGame() {
 		console.clear()
 		Dialoguer.Table
@@ -271,40 +277,37 @@ class GameLoop {
 				.text(`wait for ${Dialoguer.colors.blue.underline(this.turnName)} to play card`)
 				.cursorNextLine(1);
 		} else {
-			const drawStr = 'draw a card'
+			const cmd = {
+				draw: 'draw a card',
+				skip: 'skip'
+			} 
 			if (!this.cards.length) {
 				console.log(`you've run out of cards`)
 				return
 			}
-			const cardArr = this.cards.map((card, index) => {
+			let activeNum = 0
+			const itemsArray: SelectParam['items'] = this.cards.map((card, index) => {
+				const disabled = !card.judge(this.lastCard, this.currentColor)
+				!disabled && activeNum++
 				return {
-					name: card.toColorString() + ' ' + visualColor(card.color),
+					name: this.renderCard(card),
 					value: index.toString(),
-					disabled: !card.judge(this.lastCard, this.currentColor),
+					disabled: disabled,
 				}
 			})
-			const cmdArr = this.currentColor === CardColor.all || this.cardNum <= 0 ? [] : [drawStr]
+			if (this.cardNum !== 0) { itemsArray.push({ name: cmd.draw, value: cmd.draw }) }
+			// console.log(itemsArray)
 			const select = await this.select({
 				title: 'please choose a card',
-				items: [...cardArr, ...cmdArr],
+				items: itemsArray,
 			})
 			switch (select) {
-				case drawStr: {
+				case cmd.draw: {
 					const ret = await ws.sendFuture(MyEvent.DrawCard, null);
 					if (!ret.succ) {
 						console.log('draw card fail. press any key to continue.');
 						await new Keypress()
 						this.update()
-					} else if (ret.drawedIndex !== void 0) {
-						const sel = await this.select({
-							title: 'please select play it or skip',
-							items: ['play it', 'skip'],
-						})
-						if (sel === 'play it') {
-							await this.playCard(ret.drawedIndex)
-						} else {
-							await ws.sendFuture(MyEvent.PlayCard, { index: -1 });
-						}
 					}
 					break;
 				}
@@ -393,7 +396,7 @@ class GameLoop {
 		}
 	}
 
-	async select(option: Parameters<typeof Dialoguer.Select>[0]) {
+	async select(option: SelectParam) {
 		if (!this._inputting) {
 			this._inputting = true
 			const ret = await Dialoguer.Select(option)

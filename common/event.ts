@@ -15,7 +15,6 @@ export enum MyEvent {
 	PlayCard,
 	/** 抽牌 */
 	DrawCard,
-	/** 跳过 */
 	// PUSH
 	PlayerJoinRoom,
 	PlayerExitRoom,
@@ -71,10 +70,7 @@ export interface ResponseEventDataDefine {
 	[MyEvent.PlayCard]: {
 		succ: boolean
 	}
-	[MyEvent.DrawCard]: {
-		succ: boolean
-		drawedIndex?: number
-	}
+	[MyEvent.DrawCard]: Result
 	[MyEvent.Ready]: Result
 }
 /**

@@ -1,5 +1,5 @@
 import { Card, CardType, CardColor, SkipCard, Plus2Card, Plus4Card, NumberCard, ReverseCard, ColorSwitchCard } from "../common/card.ts"
-import { GameState, UserState } from "../common/state.ts";
+import { GameState } from "../common/state.ts";
 import { Connection, Rooms } from "./cache.ts";
 import { MyEvent } from "../common/event.ts";
 
@@ -213,13 +213,15 @@ export class PM {
 		return true
 	}
 
-	onGameOver(winner: string) {
+	onGameOver(winner: string | undefined) {
 		this.life = false
 		const scoreMap: Record<string, number> = {}
+		let min = Number.MAX_SAFE_INTEGER, _winner = winner ?? ''
 		Object.keys(this.players).forEach(key => {
 			const cards = this.players[key]
 			const score = this.calCardScore(cards)
 			scoreMap[key] = score
+			if (!_winner && min > score) { min = score, _winner = key }
 		})
 		Object.keys(this.players).forEach(id => {
 			if (!this.leavePlayers[id]) {
@@ -231,6 +233,7 @@ export class PM {
 			}
 		})
 		Rooms.setRoom(this.roomid, { status: GameState.Ready })
+		return _winner
 	}
 
 	playCard(uid: string, index: number, color?: CardColor) {
@@ -286,24 +289,21 @@ export class PM {
 		this.leavePlayers[turnId] && this.nextTurn(1)
 	}
 
-	drawCard(sid: string): [boolean, number?] {
+	/**
+	 * draw
+	 */
+	drawCard(sid: string) {
 		const cards = this.players[sid]
-		if (!cards) return [false]
-		if (this.cardNum <= 0) return [false]
-		let num = 1, skip = false
+		if (!cards) return false
+		if (this.cardNum <= 0) return false
+		let num = 1
 		if (this.currentPlus !== 0) {
 			num = this.currentPlus
-			skip = true
+			this.currentPlus = 0
 		}
 		const newCards = this.cards.splice(this.cards.length - 1 - num, num);
 		cards.push(...newCards)
-		if (num === 1) {
-			// index for play again
-			return [true, cards.length - 1]
-		} else {
-			this.currentPlus = 0
-			// return true for skip
-			return [true]
-		}
+		this.nextTurn()
+		return true
 	}
 }

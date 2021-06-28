@@ -140,18 +140,6 @@ export class EventRouter {
 		const roomid = PlayerCollection.get(this.sid, 'roomid')
 		if (!roomid) { return }
 		const pm = Rooms.getGameProcess(roomid)
-		if (index === -1) {
-			// skip
-			pm?.nextTurn()
-			const succ = !!pm
-			this.response(MyEvent.PlayCard, { succ })
-			Rooms.roomBroadcast(roomid, {
-				callback(sid) {
-					Connection.sendTo(MyEvent.GameMeta, sid, { turn: pm?.turnPlayerId });
-				}
-			})
-			return
-		}
 		const succ = pm?.playCard(this.sid, index, color) ?? false
 		this.response(MyEvent.PlayCard, { succ })
 		if (succ && pm) {
@@ -193,24 +181,49 @@ export class EventRouter {
 		const roomid = PlayerCollection.get(this.sid, 'roomid')
 		if (!roomid) return
 		const pm = Rooms.getGameProcess(roomid)
-		const [succ, drawedIndex] = pm?.drawCard(this.sid) ?? [false]
-		this.response(MyEvent.DrawCard, { succ, drawedIndex })
-		console.log('[draw]', succ)
+		if (!pm) return
+		const succ = pm.drawCard(this.sid) ?? [false]
+		this.response(MyEvent.DrawCard, { succ })
 		if (succ && pm) {
+			const isEnd = pm.cardNum === 0
+			let winner: string | undefined;
+			if (isEnd) {
+				winner = pm.onGameOver(void 0)
+			}
 			Rooms.roomBroadcast(roomid, {
-				callback: (sid) => {
-					Connection.sendTo(MyEvent.GameMeta, sid, {
-						cards: sid === this.sid ? pm.players[this.sid] : void 0,
+				callback: (otherId) => {
+					Connection.sendTo(MyEvent.GameMeta, otherId, {
+						cards: otherId === this.sid ? pm.players[this.sid] : void 0,
 						cardNum: pm.cardNum,
 						plus: pm.currentPlus,
 						lastCard: pm.lastCard,
 						color: pm.currentColor,
+						turn: pm.turnPlayerId,
 						playersCardsNum: {
 							[this.sid]: pm.players[this.sid].length
 						},
+						winner,
+						gameStatus: isEnd ? GameState.End : void 0,
 					})
 				}
 			})
 		}
 	}
+
+	// @Event(MyEvent.SkipCard)
+	// skip() {
+	// 	const roomid = PlayerCollection.get(this.sid, 'roomid');
+	// 	if (!roomid) return
+	// 	const pm = Rooms.getGameProcess(roomid)
+	// 	if (!pm) return
+	// 	pm.nextTurn(1)
+	// 	this.response(MyEvent.SkipCard, { succ: true })
+	// 	Rooms.roomBroadcast(roomid, {
+	// 		callback(sid) {
+	// 			Connection.sendTo(MyEvent.GameMeta, sid, {
+	// 				turn: pm.turnPlayerId
+	// 			})
+	// 		}
+	// 	})
+	// }
 }

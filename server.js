@@ -7862,7 +7862,6 @@ var GameState;
 })(GameState || (GameState = {
 }));
 class PM {
-    static TOTAL_CARD_NUM = 107;
     cardRecord = {
         [CardType.number]: 0,
         [CardType.plus2]: 20,
@@ -7905,7 +7904,7 @@ class PM {
         playerKeys.forEach((key2)=>this.players[key2] = []
         );
         this.cards = this.getInitialCard();
-        this.shuffle();
+        this.cards = this.shuffle();
         this.dealCards();
         this.turn = 0;
         this.turnPlayerId = playerKeys[0];
@@ -7984,14 +7983,14 @@ class PM {
                 arr[j]
             ];
         }
-        return arr;
+        return arr.slice(0, 16);
     }
     dealCards() {
         const playersCardsList = Object.keys(this.players).map((k)=>this.players[k]
         );
-        const len = playersCardsList.length, maxCount = this.DEAL_COUNT * len;
+        const len = playersCardsList.length, maxCountPer = this.DEAL_COUNT * len, cardNum = this.cardNum;
         let currIdx = 0;
-        for(let i1 = 0; i1 < maxCount; i1++){
+        for(let i1 = 0; i1 < maxCountPer && i1 < cardNum; i1++){
             const card = this.cards.pop();
             playersCardsList[currIdx++].push(card);
             if (currIdx >= len) {
@@ -8024,10 +8023,14 @@ class PM {
         this.life = false;
         const scoreMap = {
         };
+        let min = Number.MAX_SAFE_INTEGER, _winner = winner ?? '';
         Object.keys(this.players).forEach((key2)=>{
             const cards = this.players[key2];
             const score = this.calCardScore(cards);
             scoreMap[key2] = score;
+            if (!_winner && min > score) {
+                min = score, _winner = key2;
+            }
         });
         Object.keys(this.players).forEach((id)=>{
             if (!this.leavePlayers[id]) {
@@ -8040,6 +8043,7 @@ class PM {
         Rooms.setRoom(this.roomid, {
             status: GameState.Ready
         });
+        return _winner;
     }
     playCard(uid, index, color) {
         const cards = this.players[uid];
@@ -8077,15 +8081,17 @@ class PM {
         this.leavePlayers[turnId] && this.nextTurn(1);
     }
     drawCard(sid) {
-        const player1 = this.players[sid];
-        if (!player1) return false;
-        const num = this.currentPlus === 0 ? 1 : this.currentPlus;
+        const cards = this.players[sid];
+        if (!cards) return false;
+        if (this.cardNum <= 0) return false;
+        let num = 1;
+        if (this.currentPlus !== 0) {
+            num = this.currentPlus;
+            this.currentPlus = 0;
+        }
         const newCards = this.cards.splice(this.cards.length - 1 - num, num);
-        player1.push(...newCards);
-        this.currentPlus = 0;
-        this.lastCard = null;
-        this.currentValue = -1;
-        this.currentColor = CardColor.all;
+        cards.push(...newCards);
+        this.nextTurn();
         return true;
     }
 }
@@ -8097,9 +8103,8 @@ class Logger {
         console.error(...args3);
     };
 }
-const Constant = {
-    serverPort: '20210',
-    addr: '101.34.48.12:20210'
+const devConf = {
+    addr: 'localhost:20210'
 };
 class User {
     _name;
@@ -8319,7 +8324,7 @@ class Rooms {
         this._gameProcess[roomid] = pm;
         this.roomBroadcast(roomid, {
             callback: (sid)=>{
-                Connection.sendTo(MyEvent.GameMeta, sid, {
+                const data = {
                     cards: pm.players[sid],
                     color: pm.currentColor,
                     turn: Object.keys(pm.players)[pm.turn],
@@ -8331,7 +8336,9 @@ class Rooms {
                         return p;
                     }, {
                     })
-                });
+                };
+                console.log(data);
+                Connection.sendTo(MyEvent.GameMeta, sid, data);
             }
         });
     }
@@ -8345,6 +8352,14 @@ class cardStack {
         return this.cards.pop();
     }
 }
+const prodConf = {
+    addr: '101.34.48.12:20210'
+};
+const defaultConf = {
+    isDev: false,
+    serverPort: '20210'
+};
+const Constant = Object.assign(defaultConf, defaultConf.isDev ? devConf : prodConf);
 const playerUser = new User('nick');
 const ServerConf = {
     maxRoom: 100,
@@ -8518,63 +8533,75 @@ let EventRouter = ((_class = class EventRouter1 {
         }
         const pm = Rooms.getGameProcess(roomid2);
         const succ = pm?.playCard(this.sid, index, color6) ?? false;
-        console.log('[play]', succ);
         this.response(MyEvent.PlayCard, {
             succ
         });
         if (succ && pm) {
-            const cardNum = pm.players[this.sid].length;
-            const winner = cardNum === 0 ? this.sid : void 0;
-            Rooms.roomBroadcast(roomid2, {
-                before: ()=>{
-                    winner && pm.onGameOver(winner);
-                },
-                callback: (sid)=>{
-                    Connection.sendTo(MyEvent.GameMeta, sid, {
-                        turn: pm.turnPlayerId,
-                        clockwise: pm.clockwise,
-                        color: pm.currentColor,
-                        plus: pm.currentPlus,
-                        cardNum: pm.cardNum,
-                        lastCard: pm.lastCard,
-                        cards: sid === this.sid ? pm.players[this.sid] : void 0,
-                        playersCardsNum: {
-                            [this.sid]: cardNum
-                        },
-                        gameStatus: winner ? GameState.End : void 0,
-                        winner
-                    });
-                    winner && PlayerCollection.set(sid, {
-                        status: UserState.Online
-                    }) && Connection.sendTo(MyEvent.RoomUserState, sid, [
-                        sid,
-                        UserState.Online
-                    ]);
-                }
-            });
+            this._afterPlaySucc(roomid2, pm);
         }
+    }
+    _afterPlaySucc(roomid, pm) {
+        const cardNum = pm.players[this.sid].length;
+        const winner = cardNum === 0 ? this.sid : void 0;
+        Rooms.roomBroadcast(roomid, {
+            before: ()=>{
+                winner && pm.onGameOver(winner);
+            },
+            callback: (sid)=>{
+                Connection.sendTo(MyEvent.GameMeta, sid, {
+                    turn: pm.turnPlayerId,
+                    clockwise: pm.clockwise,
+                    color: pm.currentColor,
+                    plus: pm.currentPlus,
+                    cardNum: pm.cardNum,
+                    lastCard: pm.lastCard,
+                    cards: sid === this.sid ? pm.players[this.sid] : void 0,
+                    playersCardsNum: {
+                        [this.sid]: cardNum
+                    },
+                    gameStatus: winner ? GameState.End : void 0,
+                    winner
+                });
+                winner && PlayerCollection.set(sid, {
+                    status: UserState.Online
+                }) && Connection.sendTo(MyEvent.RoomUserState, sid, [
+                    sid,
+                    UserState.Online
+                ]);
+            }
+        });
     }
     drawcard() {
         const roomid2 = PlayerCollection.get(this.sid, 'roomid');
         if (!roomid2) return;
         const pm = Rooms.getGameProcess(roomid2);
-        const succ = pm?.drawCard(this.sid) ?? false;
+        if (!pm) return;
+        const succ = pm.drawCard(this.sid) ?? [
+            false
+        ];
         this.response(MyEvent.DrawCard, {
             succ
         });
-        console.log('[draw]', succ);
         if (succ && pm) {
+            const isEnd = pm.cardNum === 0;
+            let winner;
+            if (isEnd) {
+                winner = pm.onGameOver(void 0);
+            }
             Rooms.roomBroadcast(roomid2, {
-                callback: (sid)=>{
-                    Connection.sendTo(MyEvent.GameMeta, sid, {
-                        cards: sid === this.sid ? pm.players[this.sid] : void 0,
+                callback: (otherId)=>{
+                    Connection.sendTo(MyEvent.GameMeta, otherId, {
+                        cards: otherId === this.sid ? pm.players[this.sid] : void 0,
                         cardNum: pm.cardNum,
                         plus: pm.currentPlus,
                         lastCard: pm.lastCard,
                         color: pm.currentColor,
+                        turn: pm.turnPlayerId,
                         playersCardsNum: {
                             [this.sid]: pm.players[this.sid].length
-                        }
+                        },
+                        winner,
+                        gameStatus: isEnd ? GameState.End : void 0
                     });
                 }
             });
@@ -8600,7 +8627,7 @@ let EventRouter = ((_class = class EventRouter1 {
     _dec8
 ], Object.getOwnPropertyDescriptor(_class.prototype, "drawcard"), _class.prototype), _class);
 const importMeta = {
-    url: "file:///Users/jacob/dev/pro/deno-uno/server/server.ts",
+    url: "file:///C:/D/Pro/deno-uno/server/server.ts",
     main: import.meta.main
 };
 async function handleWs1(sock1) {
@@ -8628,7 +8655,7 @@ async function handleWs1(sock1) {
                     try {
                         router.handle(req);
                     } catch (e) {
-                        console.log(e);
+                        console.error(e);
                     }
                 }
             }
