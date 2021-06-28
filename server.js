@@ -7656,6 +7656,9 @@ class Connection {
     static _data = {
     };
     static _count = 0;
+    static get count() {
+        return this._count;
+    }
     static get(id) {
         return this._data[id] || null;
     }
@@ -8392,7 +8395,7 @@ function _applyDecoratedDescriptor(target, property, decorators, descriptor, con
     }
     return desc;
 }
-var _class, _dec, _dec1, _dec2, _dec3, _dec4, _dec5, _dec6, _dec7, _dec8;
+var _class, _dec, _dec1, _dec2, _dec3, _dec4, _dec5, _dec6, _dec7, _dec8, _dec9;
 const map = {
 };
 function Event1(event) {
@@ -8418,6 +8421,9 @@ let EventRouter = ((_class = class EventRouter1 {
         const { func , data  } = req;
         const executor = map[func];
         executor.call(this, data);
+    }
+    online() {
+        this.response(MyEvent.OnlineNum, Connection.count);
     }
     login(data) {
         let succ = true, reason;
@@ -8608,27 +8614,29 @@ let EventRouter = ((_class = class EventRouter1 {
             });
         }
     }
-}) || _class, _dec = Event1(MyEvent.Login), _applyDecoratedDescriptor(_class.prototype, "login", [
+}) || _class, _dec = Event1(MyEvent.OnlineNum), _applyDecoratedDescriptor(_class.prototype, "online", [
     _dec
-], Object.getOwnPropertyDescriptor(_class.prototype, "login"), _class.prototype), _dec1 = Event1(MyEvent.ChangeNick), _applyDecoratedDescriptor(_class.prototype, "changeNick", [
+], Object.getOwnPropertyDescriptor(_class.prototype, "online"), _class.prototype), _dec1 = Event1(MyEvent.Login), _applyDecoratedDescriptor(_class.prototype, "login", [
     _dec1
-], Object.getOwnPropertyDescriptor(_class.prototype, "changeNick"), _class.prototype), _dec2 = Event1(MyEvent.GetRoomList), _applyDecoratedDescriptor(_class.prototype, "getRoomList", [
+], Object.getOwnPropertyDescriptor(_class.prototype, "login"), _class.prototype), _dec2 = Event1(MyEvent.ChangeNick), _applyDecoratedDescriptor(_class.prototype, "changeNick", [
     _dec2
-], Object.getOwnPropertyDescriptor(_class.prototype, "getRoomList"), _class.prototype), _dec3 = Event1(MyEvent.CreateRoom), _applyDecoratedDescriptor(_class.prototype, "createRoom", [
+], Object.getOwnPropertyDescriptor(_class.prototype, "changeNick"), _class.prototype), _dec3 = Event1(MyEvent.GetRoomList), _applyDecoratedDescriptor(_class.prototype, "getRoomList", [
     _dec3
-], Object.getOwnPropertyDescriptor(_class.prototype, "createRoom"), _class.prototype), _dec4 = Event1(MyEvent.JoinRoom), _applyDecoratedDescriptor(_class.prototype, "joinRoom", [
+], Object.getOwnPropertyDescriptor(_class.prototype, "getRoomList"), _class.prototype), _dec4 = Event1(MyEvent.CreateRoom), _applyDecoratedDescriptor(_class.prototype, "createRoom", [
     _dec4
-], Object.getOwnPropertyDescriptor(_class.prototype, "joinRoom"), _class.prototype), _dec5 = Event1(MyEvent.ExitRoom), _applyDecoratedDescriptor(_class.prototype, "exitRoom", [
+], Object.getOwnPropertyDescriptor(_class.prototype, "createRoom"), _class.prototype), _dec5 = Event1(MyEvent.JoinRoom), _applyDecoratedDescriptor(_class.prototype, "joinRoom", [
     _dec5
-], Object.getOwnPropertyDescriptor(_class.prototype, "exitRoom"), _class.prototype), _dec6 = Event1(MyEvent.Ready), _applyDecoratedDescriptor(_class.prototype, "ready", [
+], Object.getOwnPropertyDescriptor(_class.prototype, "joinRoom"), _class.prototype), _dec6 = Event1(MyEvent.ExitRoom), _applyDecoratedDescriptor(_class.prototype, "exitRoom", [
     _dec6
-], Object.getOwnPropertyDescriptor(_class.prototype, "ready"), _class.prototype), _dec7 = Event1(MyEvent.PlayCard), _applyDecoratedDescriptor(_class.prototype, "playcard", [
+], Object.getOwnPropertyDescriptor(_class.prototype, "exitRoom"), _class.prototype), _dec7 = Event1(MyEvent.Ready), _applyDecoratedDescriptor(_class.prototype, "ready", [
     _dec7
-], Object.getOwnPropertyDescriptor(_class.prototype, "playcard"), _class.prototype), _dec8 = Event1(MyEvent.DrawCard), _applyDecoratedDescriptor(_class.prototype, "drawcard", [
+], Object.getOwnPropertyDescriptor(_class.prototype, "ready"), _class.prototype), _dec8 = Event1(MyEvent.PlayCard), _applyDecoratedDescriptor(_class.prototype, "playcard", [
     _dec8
+], Object.getOwnPropertyDescriptor(_class.prototype, "playcard"), _class.prototype), _dec9 = Event1(MyEvent.DrawCard), _applyDecoratedDescriptor(_class.prototype, "drawcard", [
+    _dec9
 ], Object.getOwnPropertyDescriptor(_class.prototype, "drawcard"), _class.prototype), _class);
 const importMeta = {
-    url: "file:///C:/D/Pro/deno-uno/server/server.ts",
+    url: "file:///Users/jacob/dev/pro/deno-uno/server/server.ts",
     main: import.meta.main
 };
 async function handleWs1(sock1) {
