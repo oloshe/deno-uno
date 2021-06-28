@@ -10,6 +10,9 @@ type roomid = string
 export class Connection {
 	private static _data: Record<sockid, WebSocket | undefined> = {}
 	private static _count = 0;
+	static get count() {
+		return this._count
+	}
 
 	static get(id: string): WebSocket | null {
 		return this._data[id] || null

@@ -57,6 +57,7 @@ interface EventDataDefine {
 export interface ResponseEventDataDefine {
 	[MyEvent.Login]: Result & { userId: string, reason?: string }
 	[MyEvent.ChangeNick]: Result
+	[MyEvent.OnlineNum]: number
 	[MyEvent.CreateRoom]: Result & { roomid: string }
 	[MyEvent.GetRoomList]: {
 		list: IRoomRes[]
@@ -81,7 +82,6 @@ export interface PushDataDefine{
 	[MyEvent.ExitRoom]: {
 		sockid: string
 	}
-	[MyEvent.OnlineNum]: number
 	[MyEvent.PlayerJoinRoom]: {
 		playerData: PlayerData
 		roomData: Pick<IRoomRes, 'count'>

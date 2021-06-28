@@ -10,7 +10,7 @@ import { GameState } from "../common/mod.ts";
 export const mainMenu = async () => {
 	while (1) {
 		console.clear()
-		myInfo()
+		await myInfo()
 		console.log()
 		const items = [
 			'room list',
@@ -54,9 +54,20 @@ export const settingMenu = async () => {
 	}
 }
 
-export const myInfo = () => {
-	console.log(Dialoguer.colors.blue('~') +' Deno Uno')
-	console.log(`[nick: ${playerUser.name}]`)
+export const myInfo = async () => {
+	const online = await ws.sendFuture(MyEvent.OnlineNum, null);
+	let ctrlTip = `press ${Dialoguer.colors.blue('W')} or ${Dialoguer.colors.blue(`S`)} to move, ${Dialoguer.colors.blue('Enter')} to confirm`
+	Dialoguer.tty
+		.text(Dialoguer.colors.blue('~'))
+		.cursorForward(1)
+		.text('Deno Uno')
+		.cursorNextLine(1)
+		.text(`[nick: ${playerUser.name}]`)
+		.cursorForward(1)
+		.text(`[online: ${online}]`)
+		.cursorNextLine(2)
+		.text(ctrlTip)
+		.cursorNextLine(1);
 }
 
 export const roomList = async (no = 1) => {

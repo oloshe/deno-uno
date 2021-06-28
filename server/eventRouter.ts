@@ -31,6 +31,11 @@ export class EventRouter {
 		executor.call(this, data)
 	}
 
+	@Event(MyEvent.OnlineNum) 
+	online(){
+		this.response(MyEvent.OnlineNum, Connection.count)
+	}
+
 	@Event(MyEvent.Login)
 	login(data: EventData<MyEvent.Login>) {
 		let succ = true, reason: string | undefined
@@ -48,7 +53,11 @@ export class EventRouter {
 			Logger.log(`[login]`, data.nick)
 			succ = PlayerCollection.add(this.sid, { nick: data.nick, status: UserState.Online, _sockid: this.sid })
 		}
-		this.response(MyEvent.Login, { succ, userId: this.sid, reason });
+		this.response(MyEvent.Login, {
+			succ,
+			userId: this.sid,
+			reason,
+		});
 	}
 
 	@Event(MyEvent.ChangeNick)
