@@ -75,7 +75,6 @@ export async function gamePage() {
 				cardNum,
 				gameStatus,
 				lastCard,
-				drawedIndex,
 				playersCardsNum,
 				playerState,
 				winner,
@@ -414,7 +413,6 @@ class GameLoop {
 	}
 
 	end() {
-		console.log('end')
 		this.signal.resolve(false)
 	}
 
