@@ -11,7 +11,7 @@ Deno: [1.11.2](https://deno.land/#installation)
 ### play
 
 ```shell
-deno run --unstable --allow-net https://gitee.com/oloshe/deno-uno/raw/master/uno@v0.1.0.js
+deno run --unstable --allow-net https://gitee.com/oloshe/deno-uno/attach_files/756244/download/uno@0.1.0.js
 ```
 
 > For convenience, the following command replaces the URL address with `uno.js`
